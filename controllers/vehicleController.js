@@ -103,6 +103,7 @@ const washvehicle = async (req,res)=>{
     }
 }
 
+
 //receipt of completed car wash
 const receipt = async (req,res)=>{
     try {
