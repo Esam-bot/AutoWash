@@ -123,5 +123,8 @@ module.exports ={
     addvehicle,
     getvehicle,
     washvehicle,
-    receipt
+    receipt,
+    checkAndUpdateCompletedVehicles
 }
+
+setInterval(checkAndUpdateCompletedVehicles, 60000);
