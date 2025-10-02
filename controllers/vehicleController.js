@@ -120,6 +120,7 @@ const receipt = async (req,res)=>{
     }
 }
 
+
 module.exports ={ 
     addvehicle,
     getvehicle,
