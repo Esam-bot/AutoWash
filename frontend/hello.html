@@ -501,10 +501,10 @@
             </button>
             
             <div class="token-display" id="tokenDisplay">
-                <h4>Your Wash Token</h4>
+                <h4>Your Customer ID</h4>
                 <div class="token-value" id="tokenValue"></div>
                 <p style="margin-top: 10px; color: var(--white-muted); font-size: 0.8rem;">
-                    <i class="fas fa-info-circle"></i> Save this token for tracking your vehicle
+                    <i class="fas fa-info-circle"></i> Save this ID for tracking your vehicle
                 </p>
             </div>
             
@@ -669,7 +669,7 @@
                     showNotification('Vehicle added successfully! Token generated.', 'success');
                     
                     // Display the generated token
-                    document.getElementById('tokenValue').textContent = vehicle.Token;
+                    document.getElementById('tokenValue').textContent = vehicle._id;
                     document.getElementById('tokenDisplay').style.display = 'block';
                     
                     // Clear form
