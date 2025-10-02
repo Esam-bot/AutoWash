@@ -12,6 +12,7 @@ app.use(express.json())
 //routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
 
+
 // connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0', {
     useNewUrlParser: true,
@@ -38,3 +39,5 @@ app.listen(PORT, () => {
     console.log('Server running on port 9000')
     console.log('Frontend available at: http://localhost:9000')
 })
+
+
