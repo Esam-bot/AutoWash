@@ -44,9 +44,9 @@ const addvehicle = async (req,res)=>{
             return res.status(400).json({message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'});
         }
         
-        const existingVehicle = await Vehicle.findOne({ numberPlate: numberPlate});
+        const existingVehicle = await Vehicle.findOne({ numberPlate: numberPlate , vehicleType: { $ne: vehicleType }});
         if (existingVehicle) {
-            return res.status(400).json({message: 'Number plate already exists in the system!'});
+            return res.status(400).json({ message: `Number plate ${numberPlate} is already registered as a ${existingVehicle.vehicleType}! Cannot use it for ${vehicleType}.`});
         }
         const token = generateToken();
         
