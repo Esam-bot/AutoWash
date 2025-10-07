@@ -36,10 +36,11 @@ const checkAndUpdateCompletedVehicles = async () => {
 }
 
 //adding a vehicle
-const addvehicle = async (req,res)=>{
+const addvehicle = async (req, res) => {
     try {
-        const { numberPlate,} = req.body;
+        const { numberPlate, Assignedlane, Vehicle } = req.body;
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
+        
         if (!plateRegex.test(numberPlate)) {
             return res.status(400).json({message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'});
         }
@@ -48,11 +49,25 @@ const addvehicle = async (req,res)=>{
         if (existingVehicle) {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
+        const lastVehicleInLane = await Vehicle.findOne({
+            Assignedlane: Assignedlane,
+            status: 'pending'
+        }).sort({ estimatedCompletionTime: -1 });
+
+        let washStartTime = new Date(); 
+        
+        if (lastVehicleInLane) {
+            // Start wash after the last vehicle completes
+            washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
+        }
+
         const token = generateToken();
+        
         const vehicleData = {
-            ...req.body,
+            ...req.body,  
             Token: token,
-            status:'pending',
+            status: 'pending',
+            washStartTime: washStartTime
         };
 
         const vehicle = await Vehicle.create(vehicleData);
@@ -62,7 +77,6 @@ const addvehicle = async (req,res)=>{
         res.status(400).json({message: 'Issue adding a vehicle', error}); 
     }
 }
-
 //getting all vehicles
 const getvehicle = async (req,res)=>{
     try {
