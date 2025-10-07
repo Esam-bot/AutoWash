@@ -57,7 +57,7 @@ const addvehicle = async (req,res)=>{
             washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
         }
 
-        const washTimes = {
+        const washTime = {
             'Car': '15Min for Car',
             'Bike': '10Min for Bike', 
             'Truck': '20Min for Truck'
