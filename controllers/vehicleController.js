@@ -48,6 +48,7 @@ const addvehicle = async (req,res)=>{
         if (existingVehicle) {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
+        
         const token = generateToken();
         
         const vehicleData = {
