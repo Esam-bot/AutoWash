@@ -49,7 +49,11 @@ const addvehicle = async (req,res)=>{
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
         
-        const lastVehicleInLane  = await Vehicle.findone({Assignedlane : Assignedlane , status : 'pending'}).sort({ estimatedCompletionTime: -1 });
+        const lastVehicleInLane  = await Vehicle.findone({
+            Assignedlane : Assignedlane,
+            status : 'pending'
+        }).sort({ estimatedCompletionTime: -1 });
+        
         let washStartTime = new Date(); 
         
         if (lastVehicleInLane) {
