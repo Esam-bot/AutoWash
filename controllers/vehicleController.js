@@ -49,13 +49,29 @@ const addvehicle = async (req, res) => {
         if (existingVehicle) {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
+          const lastVehicleInLane = await Vehicle.findOne({
+            Assignedlane: Assignedlane,
+            status: 'pending'
+        }).sort({ estimatedCompletionTime: -1 });
+
+        let washStartTime = new Date(); 
+        
+        if (lastVehicleInLane) {
+            // Start wash after the last vehicle completes
+            washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
+            console.log(`⏰ Vehicle will start after ${lastVehicleInLane.numberPlate} completes`);
+        } else {
+            // Lane is empty - start immediately
+            washStartTime = new Date();
+            console.log(`⏰ Lane ${Assignedlane} is empty - starting immediately`);
+        }
 
         const token = generateToken();
         
         const vehicleData = {
             ...req.body,  
             Token: token,
-            status: 'pending',
+            status: 'pending',washStartTime : washStartTime
         };
 
         const vehicle = await Vehicle.create(vehicleData);
