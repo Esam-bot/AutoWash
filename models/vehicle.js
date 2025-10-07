@@ -10,8 +10,8 @@ const vehicleModelSchema = mongoose.Schema(
         numberPlate:{
             type: String,
             required: [ true, 'Add Number plate!' ], 
-             validator: {
-                function(plate) {
+             validate: {
+                validator: function(plate) {
                     return /^[A-Z]{2,3}-\d{1,4}$/.test(plate); //pak number plate
                 },
                 message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'
