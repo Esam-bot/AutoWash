@@ -38,7 +38,7 @@ const checkAndUpdateCompletedVehicles = async () => {
 //adding a vehicle
 const addvehicle = async (req,res)=>{
     try {
-        const { numberPlate, Assignedlane, Vehicle } = req.body;
+        const { numberPlate,} = req.body;
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
         if (!plateRegex.test(numberPlate)) {
             return res.status(400).json({message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'});
