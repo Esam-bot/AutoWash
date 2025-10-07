@@ -38,18 +38,18 @@ const checkAndUpdateCompletedVehicles = async () => {
 //adding a vehicle
 const addvehicle = async (req,res)=>{
     try {
-        const { numberPlate } = req.body;
+        const { numberPlate, Assignedlane, Vehicle } = req.body;
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
         if (!plateRegex.test(numberPlate)) {
             return res.status(400).json({message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'});
         }
         
-        const existingVehicle = await Vehicle.findone({ numberPlate: numberPlate});
+        const existingVehicle = await Vehicle.findOne({ numberPlate: numberPlate});
         if (existingVehicle) {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
         
-        const lastVehicleInLane  = await Vehicle.findone({
+        const lastVehicleInLane  = await Vehicle.findOne({
             Assignedlane : Assignedlane,
             status : 'pending'
         }).sort({ estimatedCompletionTime: -1 });
@@ -61,7 +61,7 @@ const addvehicle = async (req,res)=>{
             washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
         }
 
-        const washTime = {
+        const washTimes = {
             'Car': '15Min for Car',
             'Bike': '10Min for Bike', 
             'Truck': '20Min for Truck'
@@ -72,7 +72,7 @@ const addvehicle = async (req,res)=>{
         
         const vehicleData = {
             ...req.body,
-            WashTime: washTimes[Vehicle], // Added WashTime based on vehicle type
+            WashTimes: washTimes[Vehicle], // Added WashTime based on vehicle type
             Token: token,
             status:'pending',
             washStartTime : washStartTime
