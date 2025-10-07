@@ -72,7 +72,7 @@ const addvehicle = async (req,res)=>{
         
         const vehicleData = {
             ...req.body,
-            WashTimes: washTimes[Vehicle], // Added WashTime based on vehicle type
+            WashTime: washTimes[Vehicle], // Added WashTime based on vehicle type
             Token: token,
             status:'pending',
             washStartTime : washStartTime
