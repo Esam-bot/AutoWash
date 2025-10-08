@@ -38,7 +38,7 @@ const checkAndUpdateCompletedVehicles = async () => {
 //adding a vehicle
 const addvehicle = async (req, res) => {
     try {
-        const { numberPlate } = req.body;
+        const { numberPlate, Vehicle, Assignedlane, WashTime } = req.body; // Add missing destructuring
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
         
         if (!plateRegex.test(numberPlate)) {
@@ -50,12 +50,31 @@ const addvehicle = async (req, res) => {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
 
+        const lastVehicleInLane = await Vehicle.findOne({
+            Assignedlane: Assignedlane,
+            status: 'pending'
+        }).sort({ estimatedCompletionTime: -1 });
+
+        let washStartTime = new Date();
+        if (lastVehicleInLane) {
+            washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
+        }
+
+        let washTimeMinutes = 15; // default
+        if (WashTime.includes('15')) washTimeMinutes = 15;
+        else if (WashTime.includes('10')) washTimeMinutes = 10; 
+        else if (WashTime.includes('20')) washTimeMinutes = 20;
+
+        const estimatedCompletionTime = new Date(washStartTime.getTime() + washTimeMinutes * 60000);
+
         const token = generateToken();
         
         const vehicleData = {
             ...req.body,  
             Token: token,
-            status: 'pending'
+            status: 'pending',
+            washStartTime: washStartTime,           
+            estimatedCompletionTime: estimatedCompletionTime  
         };
 
         const vehicle = await Vehicle.create(vehicleData);
