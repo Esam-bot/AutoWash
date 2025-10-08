@@ -38,7 +38,7 @@ const checkAndUpdateCompletedVehicles = async () => {
 //adding a vehicle
 const addvehicle = async (req, res) => {
     try {
-        const { numberPlate, Vehicle, Assignedlane, WashTime } = req.body; // Add missing destructuring
+        const { numberPlate, Vehicle: vehicleType, Assignedlane, WashTime } = req.body; // Add missing destructuring
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
         
         if (!plateRegex.test(numberPlate)) {
