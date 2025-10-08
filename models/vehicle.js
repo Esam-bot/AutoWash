@@ -48,13 +48,13 @@ const vehicleModelSchema = mongoose.Schema(
         },
         estimatedCompletionTime: {
             type: Date,
-            default: function() { 
-                const washMinutes = this.WashTime.includes('15') ? 15 : 
-                this.WashTime.includes('10') ? 10 : 20;
-                const completion = new Date();
-                completion.setMinutes(completion.getMinutes() + washMinutes);
-                return completion;
-            }
+            //default: function() { 
+              //  const washMinutes = this.WashTime.includes('15') ? 15 : 
+              //  this.WashTime.includes('10') ? 10 : 20;
+              //  const completion = new Date();
+              //  completion.setMinutes(completion.getMinutes() + washMinutes);
+              //  return completion;
+            //}
         },
         completedAt: {
             type: Date        
