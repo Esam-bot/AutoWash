@@ -38,7 +38,7 @@ const checkAndUpdateCompletedVehicles = async () => {
 //adding a vehicle
 const addvehicle = async (req, res) => {
     try {
-        const { numberPlate, Vehicle: vehicleType, Assignedlane, WashTime } = req.body; // Add missing destructuring
+        const { numberPlate, Vehicle: vehicleType, WashTime } = req.body; // Add missing destructuring
         const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
         
         if (!plateRegex.test(numberPlate)) {
@@ -50,8 +50,10 @@ const addvehicle = async (req, res) => {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
 
+        const assignedlane = await assignsmartlane()
+
         const lastVehicleInLane = await Vehicle.findOne({
-            Assignedlane: Assignedlane,
+            Assignedlane: assignedlane,
             status: 'pending'
         }).sort({ estimatedCompletionTime: -1 });
 
@@ -73,6 +75,7 @@ const addvehicle = async (req, res) => {
             ...req.body,  
             Token: token,
             status: 'pending',
+            Assignedlane : assignedlane,
             washStartTime: washStartTime,           
             estimatedCompletionTime: estimatedCompletionTime  
         };
@@ -84,6 +87,34 @@ const addvehicle = async (req, res) => {
         res.status(400).json({message: 'Issue adding a vehicle', error}); 
     }
 }
+async function assignsmartlane(){
+    try {
+        const activeVehicles = await Vehicle.find({status:'pending'});
+        const checklane={
+            lane1 : false,
+            lane2 : false,
+            lane3 : false
+        }
+
+        activeVehicles.forEach(vehicle=> {
+            if (vehicle.Assignedlane ===  1) checklane.lane1 = true ; // 1 because my db store it as 1 
+            if (vehicle.Assignedlane ===  2) checklane.lane2 = true ; 
+            if (vehicle.Assignedlane ===  3) checklane.lane3 = true ;            
+        });
+
+        //priority lane 1 so
+        if (!checklane.lane1) return  1;
+        else if (!checklane.lane2) return  2;
+        else if (!checklane.lane3) return  3;
+        else return 1 ;
+
+    } catch (error) {
+        console.error('Error assigning lane:', error);
+        return 1
+        
+    }
+}
+
 //getting all vehicles
 const getvehicle = async (req,res)=>{
     try {
