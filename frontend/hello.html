@@ -478,7 +478,7 @@
                 <input class="form-control" type="text" id="numberPlate" name="numberPlate" placeholder="Enter vehicle number plate" required>
             </div>
             
-            <div class="form-group">
+         <!--   <div class="form-group">
                 <label class="form-label" for="assignedLane">
                     <i class="fas fa-road"></i>
                     Assigned Lane
@@ -490,7 +490,7 @@
                     <option value="3">Lane 3</option>
                 </select>
             </div>
-            
+            -->
             <div class="price-display">
                 <p><i class="fas fa-tag"></i> <span id="price-display">Select vehicle type to see price</span></p>
                 <p><i class="fas fa-clock"></i> <span id="time-display">Select vehicle type to see wash time</span></p>
@@ -633,9 +633,9 @@
         document.getElementById('addVehicleBtn').addEventListener('click', async function() {
             const vehicleType = document.getElementById('vehicleType').value;
             const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
-            const assignedLane = document.getElementById('assignedLane').value;
+         //   const assignedLane = document.getElementById('assignedLane').value;
             
-            if (!vehicleType || !numberPlate || !assignedLane) {
+            if (!vehicleType || !numberPlate){ //|| !assignedLane) {
                 showNotification('Please fill all fields', 'error');
                 return;
             }
@@ -648,7 +648,7 @@
             const formData = {
                 Vehicle: vehicleType,
                 numberPlate: numberPlate,
-                Assignedlane: parseInt(assignedLane),
+             //   Assignedlane: parseInt(assignedLane),
                 Price: vehiclePrices[vehicleType],
                 WashTime: vehicleWashTimes[vehicleType]
             };
@@ -675,7 +675,7 @@
                     // Clear form
                     document.getElementById('numberPlate').value = '';
                     document.getElementById('vehicleType').selectedIndex = 0;
-                    document.getElementById('assignedLane').selectedIndex = 0;
+                 //   document.getElementById('assignedLane').selectedIndex = 0;
                     document.getElementById('price-display').textContent = 'Select vehicle type to see price';
                     document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
                     
