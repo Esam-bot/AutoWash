@@ -150,29 +150,45 @@
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            // Simple authentication (replace with real authentication)
-            if (username === 'EsamAzam' && password === 'april2004') {
-                // Redirect to main application
-                window.location.href = '/hello.html';
-            } else {
-                document.getElementById('errorMessage').style.display = 'block';
-            }
-        });
-
-        // Clear error when user starts typing
-        document.getElementById('username').addEventListener('input', function() {
-            document.getElementById('errorMessage').style.display = 'none';
+       document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
         });
         
-        document.getElementById('password').addEventListener('input', function() {
-            document.getElementById('errorMessage').style.display = 'none';
-        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Store the token in localStorage
+            localStorage.setItem('authToken', data.token);
+            // Redirect to dashboard
+            window.location.href = '/dashboard';
+        } else {
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    } catch (error) {
+        document.getElementById('errorMessage').style.display = 'block';
+        console.error('Login error:', error);
+    }
+});
+
+// Clear error when user starts typing
+document.getElementById('username').addEventListener('input', function() {
+    document.getElementById('errorMessage').style.display = 'none';
+});
+
+document.getElementById('password').addEventListener('input', function() {
+    document.getElementById('errorMessage').style.display = 'none';
+});
     </script>
 </body>
 </html>
