@@ -85,7 +85,7 @@ app.post('/api/login', (req, res) => {
 // Use vehicle routes with authentication
 app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
-// Dashboard route - FIXED: Use absolute path
+// Dashboard route
 app.get('/dashboard', (req, res) => {
     console.log('Dashboard route accessed');
     res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
@@ -111,8 +111,8 @@ app.post('/api/logout', requireAuth, (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Catch-all route for SPA - THIS IS IMPORTANT
-app.get('*', (req, res) => {
+// Catch-all route for SPA - FIXED SYNTAX
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
 });
 
