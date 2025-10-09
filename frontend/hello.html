@@ -563,7 +563,7 @@
         <p>AutoWash Pro Car Wash Management System &copy; 2023 | Premium Vehicle Care</p>
     </footer>
 
-    <script>
+   <script>
     const API_BASE = '/api/vehicles';
     let allVehicles = [];
 
@@ -582,16 +582,23 @@
 
     // Function to get auth token
     function getAuthToken() {
-        return localStorage.getItem('authToken');
+        const token = localStorage.getItem('authToken');
+        console.log('Retrieved token from localStorage:', token);
+        return token;
     }
 
     // Function to make authenticated requests
     async function makeAuthRequest(url, options = {}) {
         const token = getAuthToken();
         
+        console.log('Making authenticated request to:', url);
+        console.log('Using token:', token);
+        
         if (!token) {
             showNotification('Please login first', 'error');
-            window.location.href = '/';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
             return null;
         }
         
@@ -611,20 +618,25 @@
             }
         };
         
+        console.log('Request options:', mergedOptions);
+        
         try {
             const response = await fetch(url, mergedOptions);
+            console.log('Response status:', response.status);
             
             if (response.status === 401) {
                 showNotification('Session expired. Please login again.', 'error');
                 localStorage.removeItem('authToken');
-                window.location.href = '/';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
                 return null;
             }
             
             return response;
         } catch (error) {
+            console.error('Network error:', error);
             showNotification('Network error. Please try again.', 'error');
-            console.error('Error:', error);
             return null;
         }
     }
@@ -902,6 +914,8 @@
     // Check authentication on page load
     document.addEventListener('DOMContentLoaded', function() {
         const token = getAuthToken();
+        console.log('Dashboard loaded, token:', token);
+        
         if (!token) {
             showNotification('Please login to access dashboard', 'error');
             setTimeout(() => {
@@ -910,12 +924,39 @@
             return;
         }
         
+        console.log('User authenticated, loading vehicles...');
+        
         // Auto-refresh every 10 seconds
         setInterval(loadVehicles, 10000);
         
         // Initial load
         loadVehicles();
     });
-    </script>
+
+    // Add logout functionality
+    function logout() {
+        localStorage.removeItem('authToken');
+        window.location.href = '/';
+    }
+
+    // Add logout button to header (optional)
+    document.addEventListener('DOMContentLoaded', function() {
+        const header = document.querySelector('header');
+        const logoutBtn = document.createElement('button');
+        logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
+        logoutBtn.style.cssText = `
+            background: var(--accent-orange);
+            color: var(--black);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        `;
+        logoutBtn.onclick = logout;
+        
+        header.appendChild(logoutBtn);
+    });
+</script>
 </body>
 </html>
