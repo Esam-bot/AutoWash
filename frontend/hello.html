@@ -747,6 +747,7 @@
     });
 
     // Load all vehicles
+    let currentTab = 'pending';
     async function loadVehicles() {
         try {
             const response = await makeAuthRequest(`${API_BASE}/wash`);
@@ -754,7 +755,7 @@
                 const vehicles = await response.json();
                 allVehicles = vehicles;
                 updateStats(vehicles);
-                renderQueue('pending');
+                renderQueue(currentTab);
             } else if (response) {
                 showNotification('Error loading vehicles', 'error');
             }
@@ -766,6 +767,8 @@
 
     // Render the queue
     function renderQueue(tabName) {
+        currentTab=tabName
+
         let vehiclesToShow = [];
         
         switch(tabName) {
@@ -925,6 +928,10 @@
         }
         
         console.log('User authenticated, loading vehicles...');
+
+        document.getElementById('pendingTab')?.addEventListener('click', () => renderQueue('pending'));
+        document.getElementById('completedTab')?.addEventListener('click', () => renderQueue('completed'));
+        document.getElementById('allTab')?.addEventListener('click', () => renderQueue('all'));
         
         // Auto-refresh every 10 seconds
         setInterval(loadVehicles, 10000);
