@@ -2,21 +2,24 @@ const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 const path = require('path')
+
 const app = express()
+
+// Middleware
 app.use(cors())
+app.use(express.json())
 
 // Serve static files from frontend directory
 app.use(express.static(path.join(__dirname, 'frontend')))
-app.use(express.json())
 
 const sessions = new Map()
 
+// Authentication middleware
 function requireAuth(req, res, next) {
     console.log('Authorization header:', req.headers.authorization);
     
     const authHeader = req.headers.authorization;
     
-    // Extract token from "Bearer <token>" format
     let token;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
@@ -34,11 +37,13 @@ function requireAuth(req, res, next) {
     }
 }
 
-// Routes
+// Import routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0', {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0';
+
+mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })    
@@ -49,12 +54,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carman
     console.log('Error Connecting MongoDB:', error.message)
 })
 
-// Public routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, "frontend", "login.html"))
-})
-
-// Login API endpoint
+// API Routes
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     console.log('Login attempt:', { username, password });
@@ -82,19 +82,8 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// Use vehicle routes with authentication
+// Vehicle routes with authentication
 app.use('/api/vehicles', requireAuth, vehicleRoutes)
-
-// Dashboard route
-app.get('/dashboard', (req, res) => {
-    console.log('Dashboard route accessed');
-    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
-});
-
-// hello.html route for direct access
-app.get('/hello.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'))
-})
 
 // Logout endpoint
 app.post('/api/logout', requireAuth, (req, res) => {
@@ -111,16 +100,43 @@ app.post('/api/logout', requireAuth, (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Catch-all route for SPA - FIXED SYNTAX
-//app.get('/*', (req, res) => {
-  //  res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
-//});
+// HTML Routes - Serve the main pages
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
+});
 
-// PORT connection
-const PORT = process.env.PORT || 9000;
-app.listen(PORT, () => {
-    console.log('Server running on port 9000')
-    console.log('Frontend available at: http://localhost:9000')
-    console.log('Dashboard available at: http://localhost:9000/dashboard')
-    console.log('Login available at: http://localhost:9000/')
-})
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
+});
+
+app.get('/hello.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
+});
+
+// Health check route
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        message: 'Server is running',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Catch-all route - serve login page for any other route
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
+});
+
+// Export the app for Vercel
+module.exports = app;
+
+// For local development
+if (require.main === module) {
+    const PORT = process.env.PORT || 9000;
+    app.listen(PORT, () => {
+        console.log('🚀 Server running on port', PORT);
+        console.log('📍 Local URL: http://localhost:' + PORT);
+        console.log('📍 Dashboard: http://localhost:' + PORT + '/dashboard');
+        console.log('📍 Health Check: http://localhost:' + PORT + '/api/health');
+    });
+}
