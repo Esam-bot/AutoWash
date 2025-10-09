@@ -180,4 +180,4 @@ module.exports ={
     checkAndUpdateCompletedVehicles
 }
 
-setInterval(checkAndUpdateCompletedVehicles, 60000);
+//setInterval(checkAndUpdateCompletedVehicles, 60000);
