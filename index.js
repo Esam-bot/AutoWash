@@ -75,7 +75,7 @@ app.post('/api/login', (req, res) => {
 app.use('/api/vehicles',requireAuth, vehicleRoutes)
 
 // Serve hello.html for the root route
-app.get('/dashboard',requireAuth, (req, res) => {
+app.get('/hello.html',requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, '/frontend/hello.html'))
 })
 
