@@ -12,6 +12,8 @@ app.use(express.json())
 const sessions = new Map()
 
 function requireAuth(req, res, next) {
+    console.log('Authorization header:', req.headers.authorization);
+    
     const authHeader = req.headers.authorization;
     
     // Extract token from "Bearer <token>" format
@@ -22,10 +24,15 @@ function requireAuth(req, res, next) {
         token = authHeader; // Fallback to direct token
     }
     
+    console.log('Extracted token:', token);
+    console.log('Sessions:', Array.from(sessions.keys()));
+    
     if (token && sessions.has(token)) {
         req.user = sessions.get(token);
+        console.log('User authenticated:', req.user);
         next();
     } else {
+        console.log('Authentication failed - token not found in sessions');
         res.status(401).json({ message: 'Unauthorized. Please login.' });
     }
 }
@@ -53,6 +60,7 @@ app.get('/',(req,res)=>{
 //login api endpoint
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
+    console.log('Login attempt:', { username, password });
     
     // Simple authentication (you can enhance this later)
     if (username === 'EsamAzam' && password === 'april2004') {
@@ -63,12 +71,16 @@ app.post('/api/login', (req, res) => {
             role: 'admin'
         });
         
+        console.log('Login successful, token generated:', token);
+        console.log('Current sessions:', Array.from(sessions.keys()));
+        
         res.json({ 
             success: true, 
             token: token,
             message: 'Login successful' 
         });
     } else {
+        console.log('Login failed: Invalid credentials');
         res.status(401).json({ 
             success: false, 
             message: 'Invalid username or password' 
@@ -79,13 +91,14 @@ app.post('/api/login', (req, res) => {
 // Use your vehicle routes
 app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
-// Dashboard route
-app.get('/dashboard', requireAuth, (req, res) => {
+// Dashboard route - MAKE IT PUBLIC FOR NOW TO TEST
+app.get('/dashboard', (req, res) => {
+    console.log('Dashboard accessed');
     res.sendFile(path.join(__dirname, '/frontend/hello.html'));
 });
 
 // Serve hello.html for the root route (keep for compatibility)
-app.get('/hello.html', requireAuth, (req, res) => {
+app.get('/hello.html', (req, res) => {
     res.sendFile(path.join(__dirname, '/frontend/hello.html'))
 })
 
@@ -112,4 +125,3 @@ app.listen(PORT, () => {
     console.log('Frontend available at: http://localhost:9000')
     console.log('Dashboard available at: http://localhost:9000/dashboard')
 })
-
