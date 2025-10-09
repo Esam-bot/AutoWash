@@ -116,6 +116,13 @@
             margin-top: 15px;
             display: none;
         }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #00d4ff;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -139,9 +146,13 @@
                 <input type="password" class="form-control" id="password" placeholder="Enter password" required>
             </div>
             
-            <button type="submit" class="btn">
+            <button type="submit" class="btn" id="loginBtn">
                 <i class="fas fa-sign-in-alt"></i> Login
             </button>
+            
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner fa-spin"></i> Logging in...
+            </div>
             
             <div class="error-message" id="errorMessage">
                 Invalid username or password!
@@ -150,45 +161,97 @@
     </div>
 
     <script>
-       document.getElementById('loginForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    
-    try {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Show loading, hide error
+            loginBtn.disabled = true;
+            loading.style.display = 'block';
+            errorMessage.style.display = 'none';
+            
+            try {
+                console.log('Sending login request...');
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.success) {
+                    // Store the token in localStorage
+                    localStorage.setItem('authToken', data.token);
+                    console.log('Token stored in localStorage:', data.token);
+                    
+                    // Show success message
+                    showNotification('Login successful! Redirecting...', 'success');
+                    
+                    // Redirect to dashboard after short delay
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+                } else {
+                    errorMessage.style.display = 'block';
+                    loginBtn.disabled = false;
+                    loading.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMessage.style.display = 'block';
+                loginBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+
+        // Clear error when user starts typing
+        document.getElementById('username').addEventListener('input', function() {
+            document.getElementById('errorMessage').style.display = 'none';
         });
         
-        const data = await response.json();
-        
-        if (data.success) {
-            // Store the token in localStorage
-            localStorage.setItem('authToken', data.token);
-            // Redirect to dashboard
-            window.location.href = '/dashboard';
-        } else {
-            document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('password').addEventListener('input', function() {
+            document.getElementById('errorMessage').style.display = 'none';
+        });
+
+        // Simple notification function
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: #000;
+                font-weight: bold;
+                z-index: 1000;
+                background: ${type === 'success' ? '#00ff88' : '#ff6b35'};
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
         }
-    } catch (error) {
-        document.getElementById('errorMessage').style.display = 'block';
-        console.error('Login error:', error);
-    }
-});
 
-// Clear error when user starts typing
-document.getElementById('username').addEventListener('input', function() {
-    document.getElementById('errorMessage').style.display = 'none';
-});
-
-document.getElementById('password').addEventListener('input', function() {
-    document.getElementById('errorMessage').style.display = 'none';
-});
+        // Check if already logged in
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                console.log('Already logged in, redirecting to dashboard...');
+                window.location.href = '/dashboard';
+            }
+        });
     </script>
 </body>
 </html>
