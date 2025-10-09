@@ -564,305 +564,358 @@
     </footer>
 
     <script>
-        const API_BASE = '/api/vehicles';
-        let allVehicles = [];
+    const API_BASE = '/api/vehicles';
+    let allVehicles = [];
 
-        // Fixed prices and wash times from your vehicle.js file
-        const vehiclePrices = {
-            'Car': '500PKR for Car',
-            'Bike': '300PKR for Bike', 
-            'Truck': '800PKR for Truck'
-        };
+    // Fixed prices and wash times
+    const vehiclePrices = {
+        'Car': '500PKR for Car',
+        'Bike': '300PKR for Bike', 
+        'Truck': '800PKR for Truck'
+    };
 
-        const vehicleWashTimes = {
-            'Car': '15Min for Car',
-            'Bike': '10Min for Bike',
-            'Truck': '20Min for Truck'
-        };
+    const vehicleWashTimes = {
+        'Car': '15Min for Car',
+        'Bike': '10Min for Bike',
+        'Truck': '20Min for Truck'
+    };
 
-        // Show notification
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                <span>${message}</span>
-            `;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
+    // Function to get auth token
+    function getAuthToken() {
+        return localStorage.getItem('authToken');
+    }
+
+    // Function to make authenticated requests
+    async function makeAuthRequest(url, options = {}) {
+        const token = getAuthToken();
+        
+        if (!token) {
+            showNotification('Please login first', 'error');
+            window.location.href = '/';
+            return null;
         }
-
-        // Update price and time display when vehicle type changes
-        document.getElementById('vehicleType').addEventListener('change', function() {
-            const selectedType = this.value;
-            const priceDisplay = document.getElementById('price-display');
-            const timeDisplay = document.getElementById('time-display');
-            
-            if (selectedType && vehiclePrices[selectedType]) {
-                priceDisplay.textContent = vehiclePrices[selectedType];
-                timeDisplay.textContent = vehicleWashTimes[selectedType];
-            } else {
-                priceDisplay.textContent = 'Select vehicle type to see price';
-                timeDisplay.textContent = 'Select vehicle type to see wash time';
+        
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             }
-        });
-
-        // Show active tab
-        function showTab(tabName) {
-            // Remove active class from all tabs
-            document.querySelectorAll('.queue-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
+        };
+        
+        const mergedOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers
+            }
+        };
+        
+        try {
+            const response = await fetch(url, mergedOptions);
             
-            // Add active class to clicked tab
-            event.target.classList.add('active');
+            if (response.status === 401) {
+                showNotification('Session expired. Please login again.', 'error');
+                localStorage.removeItem('authToken');
+                window.location.href = '/';
+                return null;
+            }
             
-            // Render the appropriate list
-            renderQueue(tabName);
+            return response;
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+            console.error('Error:', error);
+            return null;
         }
+    }
 
-        function validateNumberPlate(plate) {
+    // Show notification
+    function showNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    // Update price and time display when vehicle type changes
+    document.getElementById('vehicleType').addEventListener('change', function() {
+        const selectedType = this.value;
+        const priceDisplay = document.getElementById('price-display');
+        const timeDisplay = document.getElementById('time-display');
+        
+        if (selectedType && vehiclePrices[selectedType]) {
+            priceDisplay.textContent = vehiclePrices[selectedType];
+            timeDisplay.textContent = vehicleWashTimes[selectedType];
+        } else {
+            priceDisplay.textContent = 'Select vehicle type to see price';
+            timeDisplay.textContent = 'Select vehicle type to see wash time';
+        }
+    });
+
+    // Show active tab
+    function showTab(tabName) {
+        // Remove active class from all tabs
+        document.querySelectorAll('.queue-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Add active class to clicked tab
+        event.target.classList.add('active');
+        
+        // Render the appropriate list
+        renderQueue(tabName);
+    }
+
+    function validateNumberPlate(plate) {
         const pattern = /^[A-Z]{2,3}-\d{1,4}$/;
         return pattern.test(plate);
+    }
+
+    // Add new vehicle
+    document.getElementById('addVehicleBtn').addEventListener('click', async function() {
+        const vehicleType = document.getElementById('vehicleType').value;
+        const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
+        
+        if (!vehicleType || !numberPlate) {
+            showNotification('Please fill all fields', 'error');
+            return;
         }
 
-        // Add new vehicle
-        document.getElementById('addVehicleBtn').addEventListener('click', async function() {
-            const vehicleType = document.getElementById('vehicleType').value;
-            const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
-         //   const assignedLane = document.getElementById('assignedLane').value;
+        if (!validateNumberPlate(numberPlate)) {
+            showNotification('Invalid number plate format! Use format like: ABC-123 or XYZ-1234', 'error');
+            return;
+        }    
+        
+        const formData = {
+            Vehicle: vehicleType,
+            numberPlate: numberPlate,
+            Price: vehiclePrices[vehicleType],
+            WashTime: vehicleWashTimes[vehicleType]
+        };
+        
+        console.log('Adding vehicle:', formData);
+        
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash`, {
+                method: 'POST',
+                body: JSON.stringify(formData)
+            });
             
-            if (!vehicleType || !numberPlate){ //|| !assignedLane) {
-                showNotification('Please fill all fields', 'error');
-                return;
-            }
-
-            if (!validateNumberPlate(numberPlate)) {
-                showNotification('Invalid number plate format! Use format like: ABC-123 or XYZ-1234', 'error');
-                return;
-            }    
-            
-            const formData = {
-                Vehicle: vehicleType,
-                numberPlate: numberPlate,
-             //   Assignedlane: parseInt(assignedLane),
-                Price: vehiclePrices[vehicleType],
-                WashTime: vehicleWashTimes[vehicleType]
-            };
-            
-            console.log('Adding vehicle:', formData);
-            
-            try {
-                const response = await fetch(`${API_BASE}/wash`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
+            if (response && response.ok) {
+                const vehicle = await response.json();
+                showNotification('Vehicle added successfully! Token generated.', 'success');
                 
-                if (response.ok) {
-                    const vehicle = await response.json();
-                    showNotification('Vehicle added successfully! Token generated.', 'success');
-                    
-                    // Display the generated token
-                    document.getElementById('tokenValue').textContent = vehicle._id;
-                    document.getElementById('tokenDisplay').style.display = 'block';
-                    
-                    // Clear form
-                    document.getElementById('numberPlate').value = '';
-                    document.getElementById('vehicleType').selectedIndex = 0;
-                 //   document.getElementById('assignedLane').selectedIndex = 0;
-                    document.getElementById('price-display').textContent = 'Select vehicle type to see price';
-                    document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
-                    
-                    // Refresh the vehicle list
-                    loadVehicles();
-                } else {
-                    const error = await response.json();
-                    showNotification(`Error: ${error.message}`, 'error');
-                }
-            } catch (error) {
-                showNotification('Network error. Please try again.', 'error');
-                console.error('Error:', error);
+                // Display the generated token
+                document.getElementById('tokenValue').textContent = vehicle._id;
+                document.getElementById('tokenDisplay').style.display = 'block';
+                
+                // Clear form
+                document.getElementById('numberPlate').value = '';
+                document.getElementById('vehicleType').selectedIndex = 0;
+                document.getElementById('price-display').textContent = 'Select vehicle type to see price';
+                document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
+                
+                // Refresh the vehicle list
+                loadVehicles();
+            } else if (response) {
+                const error = await response.json();
+                showNotification(`Error: ${error.message}`, 'error');
             }
-        });
-
-        // Load all vehicles
-        async function loadVehicles() {
-            try {
-                const response = await fetch(`${API_BASE}/wash`);
-                if (response.ok) {
-                    const vehicles = await response.json();
-                    allVehicles = vehicles;
-                    updateStats(vehicles);
-                    renderQueue('pending');
-                } else {
-                    showNotification('Error loading vehicles', 'error');
-                }
-            } catch (error) {
-                showNotification('Network error. Please try again.', 'error');
-                console.error('Error:', error);
-            }
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+            console.error('Error:', error);
         }
+    });
 
-        // Render the queue
-        function renderQueue(tabName) {
-            let vehiclesToShow = [];
-            
-            switch(tabName) {
-                case 'pending':
-                    vehiclesToShow = allVehicles.filter(v => v.status === 'pending');
-                    break;
-                case 'completed':
-                    vehiclesToShow = allVehicles.filter(v => v.status === 'completed');
-                    break;
-                case 'all':
-                    vehiclesToShow = allVehicles;
-                    break;
+    // Load all vehicles
+    async function loadVehicles() {
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash`);
+            if (response && response.ok) {
+                const vehicles = await response.json();
+                allVehicles = vehicles;
+                updateStats(vehicles);
+                renderQueue('pending');
+            } else if (response) {
+                showNotification('Error loading vehicles', 'error');
             }
-            
-            const container = document.getElementById('pendingVehicleList');
-            
-            if (vehiclesToShow.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-queue">
-                        <i class="fas fa-${tabName === 'pending' ? 'clock' : 'check-circle'}"></i>
-                        <p>No ${tabName} vehicles</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = vehiclesToShow.map(vehicle => `
-                <div class="vehicle-item ${vehicle.status === 'completed' ? 'completed' : ''}">
-                    <div class="vehicle-info">
-                        <h3>${vehicle.Vehicle} - ${vehicle.numberPlate}</h3>
-                        <p>Lane: ${vehicle.Assignedlane} | Price: ${vehicle.Price}</p>
-                        <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token} |  ID: ${vehicle._id}</p>
-                        <span class="status-badge ${vehicle.status === 'pending' ? 'status-pending' : 'status-completed'}">
-                            ${vehicle.status}
-                        </span>
-                    </div>
-                    <div class="vehicle-actions">
-                        ${vehicle.status === 'pending' ? 
-                            `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id}')">
-                                Mark as Completed
-                            </button>` : 
-                            '<button class="complete-btn" disabled>Completed</button>'
-                        }
-                    </div>
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+            console.error('Error:', error);
+        }
+    }
+
+    // Render the queue
+    function renderQueue(tabName) {
+        let vehiclesToShow = [];
+        
+        switch(tabName) {
+            case 'pending':
+                vehiclesToShow = allVehicles.filter(v => v.status === 'pending');
+                break;
+            case 'completed':
+                vehiclesToShow = allVehicles.filter(v => v.status === 'completed');
+                break;
+            case 'all':
+                vehiclesToShow = allVehicles;
+                break;
+        }
+        
+        const container = document.getElementById('pendingVehicleList');
+        
+        if (vehiclesToShow.length === 0) {
+            container.innerHTML = `
+                <div class="empty-queue">
+                    <i class="fas fa-${tabName === 'pending' ? 'clock' : 'check-circle'}"></i>
+                    <p>No ${tabName} vehicles</p>
                 </div>
-            `).join('');
+            `;
+            return;
         }
-
-        // Mark vehicle as completed
-        async function markAsCompleted(vehicleId) {
-            try {
-                const response = await fetch(`${API_BASE}/wash/${vehicleId}/complete`, {
-                    method: 'PATCH'
-                });
-                
-                if (response.ok) {
-                    showNotification('Vehicle marked as completed!', 'success');
-                    loadVehicles();
-                } else {
-                    const error = await response.json();
-                    showNotification(`Error: ${error.message}`, 'error');
-                }
-            } catch (error) {
-                showNotification('Network error. Please try again.', 'error');
-                console.error('Error:', error);
-            }
-        }
-
-        // Generate receipt
-        document.getElementById('getReceiptBtn').addEventListener('click', async function() {
-            const vehicleId = document.getElementById('receiptId').value;
-            if (!vehicleId) {
-                showNotification('Please enter a vehicle ID', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/wash/${vehicleId}/receipt`);
-                
-                if (response.ok) {
-                    const vehicle = await response.json();
-                    
-                    if (vehicle.message === 'Vehicle not washed yet!') {
-                        showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
-                        return;
+        
+        container.innerHTML = vehiclesToShow.map(vehicle => `
+            <div class="vehicle-item ${vehicle.status === 'completed' ? 'completed' : ''}">
+                <div class="vehicle-info">
+                    <h3>${vehicle.Vehicle} - ${vehicle.numberPlate}</h3>
+                    <p>Lane: ${vehicle.Assignedlane} | Price: ${vehicle.Price}</p>
+                    <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token} |  ID: ${vehicle._id}</p>
+                    <span class="status-badge ${vehicle.status === 'pending' ? 'status-pending' : 'status-completed'}">
+                        ${vehicle.status}
+                    </span>
+                </div>
+                <div class="vehicle-actions">
+                    ${vehicle.status === 'pending' ? 
+                        `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id}')">
+                            Mark as Completed
+                        </button>` : 
+                        '<button class="complete-btn" disabled>Completed</button>'
                     }
-                    
-                    // Create receipt in new window
-                    const receiptWindow = window.open('', '_blank', 'width=600,height=700');
-                    receiptWindow.document.write(`
-                        <html>
-                            <head>
-                                <title>AutoWash Pro - Receipt</title>
-                                <style>
-                                    body { font-family: Arial, sans-serif; padding: 20px; }
-                                    .receipt { border: 2px solid #00d4ff; padding: 20px; border-radius: 10px; }
-                                    .header { text-align: center; margin-bottom: 20px; }
-                                    .item { display: flex; justify-content: space-between; margin: 10px 0; }
-                                    .label { font-weight: bold; }
-                                </style>
-                            </head>
-                            <body>
-                                <div class="receipt">
-                                    <div class="header">
-                                        <h2>AutoWash Pro</h2>
-                                        <h3>Wash Receipt</h3>
-                                    </div>
-                                    <div class="item"><span class="label">Vehicle Type:</span> <span>${vehicle.Vehicle}</span></div>
-                                    <div class="item"><span class="label">Number Plate:</span> <span>${vehicle.numberPlate}</span></div>
-                                    <div class="item"><span class="label">Assigned Lane:</span> <span>${vehicle.Assignedlane}</span></div>
-                                    <div class="item"><span class="label">Token:</span> <span>${vehicle.Token}</span></div>
-                                    <div class="item"><span class="label">Price:</span> <span>${vehicle.Price}</span></div>
-                                    <div class="item"><span class="label">Completed AT::</span> <span>${vehicle.completedAt}</span></div>
-                                    <div class="item"><span class="label">Status:</span> <span>${vehicle.status}</span></div>
-                                    <div style="text-align: center; margin-top: 20px;">
-                                        <button onclick="window.print()">Print Receipt</button>
-                                    </div>
-                                </div>
-                            </body>
-                        </html>
-                    `);
-                    receiptWindow.document.close();
-                    
-                    showNotification('Receipt generated successfully!', 'success');
-                } else {
-                    const error = await response.json();
-                    showNotification(`Error: ${error.message}`, 'error');
-                }
-            } catch (error) {
-                showNotification('Network error. Please try again.', 'error');
-                console.error('Error:', error);
-            }
-        });
+                </div>
+            </div>
+        `).join('');
+    }
 
-        // Update statistics
-        function updateStats(vehicles) {
-            const total = vehicles.length;
-            const pending = vehicles.filter(v => v.status === 'pending').length;
-            const completed = vehicles.filter(v => v.status === 'completed').length;
+    // Mark vehicle as completed
+    async function markAsCompleted(vehicleId) {
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
+                method: 'PATCH'
+            });
             
-            document.getElementById('total-vehicles').textContent = total;
-            document.getElementById('pending-vehicles').textContent = pending;
-            document.getElementById('completed-vehicles').textContent = completed;
+            if (response && response.ok) {
+                showNotification('Vehicle marked as completed!', 'success');
+                loadVehicles();
+            } else if (response) {
+                const error = await response.json();
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+            console.error('Error:', error);
         }
+    }
 
+    // Generate receipt
+    document.getElementById('getReceiptBtn').addEventListener('click', async function() {
+        const vehicleId = document.getElementById('receiptId').value;
+        if (!vehicleId) {
+            showNotification('Please enter a vehicle ID', 'error');
+            return;
+        }
+        
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
+            
+            if (response && response.ok) {
+                const vehicle = await response.json();
+                
+                if (vehicle.message === 'Vehicle not washed yet!') {
+                    showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
+                    return;
+                }
+                
+                // Create receipt in new window
+                const receiptWindow = window.open('', '_blank', 'width=600,height=700');
+                receiptWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>AutoWash Pro - Receipt</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; padding: 20px; }
+                                .receipt { border: 2px solid #00d4ff; padding: 20px; border-radius: 10px; }
+                                .header { text-align: center; margin-bottom: 20px; }
+                                .item { display: flex; justify-content: space-between; margin: 10px 0; }
+                                .label { font-weight: bold; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="receipt">
+                                <div class="header">
+                                    <h2>AutoWash Pro</h2>
+                                    <h3>Wash Receipt</h3>
+                                </div>
+                                <div class="item"><span class="label">Vehicle Type:</span> <span>${vehicle.Vehicle}</span></div>
+                                <div class="item"><span class="label">Number Plate:</span> <span>${vehicle.numberPlate}</span></div>
+                                <div class="item"><span class="label">Assigned Lane:</span> <span>${vehicle.Assignedlane}</span></div>
+                                <div class="item"><span class="label">Token:</span> <span>${vehicle.Token}</span></div>
+                                <div class="item"><span class="label">Price:</span> <span>${vehicle.Price}</span></div>
+                                <div class="item"><span class="label">Completed AT::</span> <span>${vehicle.completedAt}</span></div>
+                                <div class="item"><span class="label">Status:</span> <span>${vehicle.status}</span></div>
+                                <div style="text-align: center; margin-top: 20px;">
+                                    <button onclick="window.print()">Print Receipt</button>
+                                </div>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                receiptWindow.document.close();
+                
+                showNotification('Receipt generated successfully!', 'success');
+            } else if (response) {
+                const error = await response.json();
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        } catch (error) {
+            showNotification('Network error. Please try again.', 'error');
+            console.error('Error:', error);
+        }
+    });
+
+    // Update statistics
+    function updateStats(vehicles) {
+        const total = vehicles.length;
+        const pending = vehicles.filter(v => v.status === 'pending').length;
+        const completed = vehicles.filter(v => v.status === 'completed').length;
+        
+        document.getElementById('total-vehicles').textContent = total;
+        document.getElementById('pending-vehicles').textContent = pending;
+        document.getElementById('completed-vehicles').textContent = completed;
+    }
+
+    // Check authentication on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const token = getAuthToken();
+        if (!token) {
+            showNotification('Please login to access dashboard', 'error');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+            return;
+        }
+        
         // Auto-refresh every 10 seconds
         setInterval(loadVehicles, 10000);
-
+        
         // Initial load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadVehicles();
-        });
+        loadVehicles();
+    });
     </script>
 </body>
 </html>
