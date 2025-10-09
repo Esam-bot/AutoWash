@@ -112,9 +112,9 @@ app.post('/api/logout', requireAuth, (req, res) => {
 });
 
 // Catch-all route for SPA - FIXED SYNTAX
-app.get('/*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
-});
+//app.get('/*', (req, res) => {
+  //  res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
+//});
 
 // PORT connection
 const PORT = process.env.PORT || 9000;
