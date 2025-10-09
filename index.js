@@ -12,7 +12,7 @@ app.use(express.json())
 // Serve static files from frontend directory
 app.use(express.static(path.join(__dirname, 'frontend')))
 
-const sessions = new Map()
+const sessions = new Map() //keep track of tokens
 
 // Authentication middleware
 function requireAuth(req, res, next) {
