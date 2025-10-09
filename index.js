@@ -12,7 +12,15 @@ app.use(express.json())
 const sessions = new Map()
 
 function requireAuth(req, res, next) {
-    const token = req.headers.authorization;
+    const authHeader = req.headers.authorization;
+    
+    // Extract token from "Bearer <token>" format
+    let token;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7); // Remove "Bearer " prefix
+    } else {
+        token = authHeader; // Fallback to direct token
+    }
     
     if (token && sessions.has(token)) {
         req.user = sessions.get(token);
@@ -24,7 +32,6 @@ function requireAuth(req, res, next) {
 
 //routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
-
 
 // connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0', {
@@ -39,13 +46,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carman
 })
 
 //public route 
-
 app.get('/',(req,res)=>{
     res.sendFile(path.join(__dirname,"/frontend/login.html"))
 })
 
 //login api endpoint
-
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     
@@ -72,18 +77,31 @@ app.post('/api/login', (req, res) => {
 });
 
 // Use your vehicle routes
-app.use('/api/vehicles',requireAuth, vehicleRoutes)
+app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
-// Serve hello.html for the root route
-app.get('/hello.html',requireAuth, (req, res) => {
+// Dashboard route
+app.get('/dashboard', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, '/frontend/hello.html'));
+});
+
+// Serve hello.html for the root route (keep for compatibility)
+app.get('/hello.html', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, '/frontend/hello.html'))
 })
 
 //log-out endpoint
-
 app.post('/api/logout', requireAuth, (req, res) => {
     const token = req.headers.authorization;
-    sessions.delete(token);
+    
+    // Extract token from Bearer format for logout too
+    let actualToken;
+    if (token && token.startsWith('Bearer ')) {
+        actualToken = token.substring(7);
+    } else {
+        actualToken = token;
+    }
+    
+    sessions.delete(actualToken);
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -92,6 +110,6 @@ const PORT = process.env.PORT || 9000;
 app.listen(PORT, () => {
     console.log('Server running on port 9000')
     console.log('Frontend available at: http://localhost:9000')
+    console.log('Dashboard available at: http://localhost:9000/dashboard')
 })
-
 
