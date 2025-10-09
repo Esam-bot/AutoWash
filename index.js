@@ -5,8 +5,8 @@ const path = require('path')
 const app = express()
 app.use(cors())
 
-// Serve static files (your hello.html and other frontend assets)
-app.use(express.static('frontend'))
+// Serve static files from frontend directory
+app.use(express.static(path.join(__dirname, 'frontend')))
 app.use(express.json())
 
 const sessions = new Map()
@@ -19,28 +19,25 @@ function requireAuth(req, res, next) {
     // Extract token from "Bearer <token>" format
     let token;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7); // Remove "Bearer " prefix
+        token = authHeader.substring(7);
     } else {
-        token = authHeader; // Fallback to direct token
+        token = authHeader;
     }
     
     console.log('Extracted token:', token);
-    console.log('Sessions:', Array.from(sessions.keys()));
     
     if (token && sessions.has(token)) {
         req.user = sessions.get(token);
-        console.log('User authenticated:', req.user);
         next();
     } else {
-        console.log('Authentication failed - token not found in sessions');
         res.status(401).json({ message: 'Unauthorized. Please login.' });
     }
 }
 
-//routes
+// Routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
 
-// connection
+// MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0', {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -52,19 +49,18 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://car_management:carman
     console.log('Error Connecting MongoDB:', error.message)
 })
 
-//public route 
-app.get('/',(req,res)=>{
-    res.sendFile(path.join(__dirname,"/frontend/login.html"))
+// Public routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "login.html"))
 })
 
-//login api endpoint
+// Login API endpoint
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     console.log('Login attempt:', { username, password });
     
-    // Simple authentication (you can enhance this later)
     if (username === 'EsamAzam' && password === 'april2004') {
-        const token = 'auth-' + Date.now(); // Generate simple token
+        const token = 'auth-' + Date.now();
         sessions.set(token, { 
             username, 
             loginTime: new Date(),
@@ -72,7 +68,6 @@ app.post('/api/login', (req, res) => {
         });
         
         console.log('Login successful, token generated:', token);
-        console.log('Current sessions:', Array.from(sessions.keys()));
         
         res.json({ 
             success: true, 
@@ -80,7 +75,6 @@ app.post('/api/login', (req, res) => {
             message: 'Login successful' 
         });
     } else {
-        console.log('Login failed: Invalid credentials');
         res.status(401).json({ 
             success: false, 
             message: 'Invalid username or password' 
@@ -88,25 +82,24 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// Use your vehicle routes
+// Use vehicle routes with authentication
 app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
-// Dashboard route - MAKE IT PUBLIC FOR NOW TO TEST
+// Dashboard route - FIXED: Use absolute path
 app.get('/dashboard', (req, res) => {
-    console.log('Dashboard accessed');
-    res.sendFile(path.join(__dirname, '/frontend/hello.html'));
+    console.log('Dashboard route accessed');
+    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
 });
 
-// Serve hello.html for the root route (keep for compatibility)
+// hello.html route for direct access
 app.get('/hello.html', (req, res) => {
-    res.sendFile(path.join(__dirname, '/frontend/hello.html'))
+    res.sendFile(path.join(__dirname, 'frontend', 'hello.html'))
 })
 
-//log-out endpoint
+// Logout endpoint
 app.post('/api/logout', requireAuth, (req, res) => {
     const token = req.headers.authorization;
     
-    // Extract token from Bearer format for logout too
     let actualToken;
     if (token && token.startsWith('Bearer ')) {
         actualToken = token.substring(7);
@@ -118,10 +111,16 @@ app.post('/api/logout', requireAuth, (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// Catch-all route for SPA - THIS IS IMPORTANT
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
+});
+
 // PORT connection
 const PORT = process.env.PORT || 9000;
 app.listen(PORT, () => {
     console.log('Server running on port 9000')
     console.log('Frontend available at: http://localhost:9000')
     console.log('Dashboard available at: http://localhost:9000/dashboard')
+    console.log('Login available at: http://localhost:9000/')
 })
