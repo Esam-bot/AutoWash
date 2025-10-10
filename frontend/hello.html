@@ -830,106 +830,112 @@
 
     // Generate receipt
     document.getElementById('getReceiptBtn').addEventListener('click', async function() {
-        const vehicleId = document.getElementById('receiptId').value.trim();
-        if (!vehicleId) {
-            showNotification('Please enter a vehicle ID', 'error');
+    const vehicleId = document.getElementById('receiptId').value.trim();
+    if (!vehicleId) {
+        showNotification('Please enter a vehicle ID', 'error');
+        return;
+    }
+    
+    try {
+        const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
+        const vehicle = await response.json();
+        
+        if (vehicle.message === 'Vehicle not washed yet!') {
+            showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
             return;
         }
         
-        try {
-            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
-            const vehicle = await response.json();
+        // SIMPLE SOLUTION: Always use modal/popup instead of checking device type
+        showReceiptModal(vehicle);
+        document.getElementById('receiptId').value = '';
+        
+    } catch (error) {
+        // Error is already handled in makeAuthRequest
+    }
+});
+
+// Simple modal function that works everywhere
+function showReceiptInNewTab(vehicle) {
+    // Create a simple popup/modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            background: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            max-width: 500px; 
+            width: 100%;
+            color: black;
+        ">
+            <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #333;">AutoWash Pro</h2>
+                <h3 style="margin: 10px 0; color: #666;">Wash Receipt</h3>
+            </div>
             
-            if (vehicle.message === 'Vehicle not washed yet!') {
-                showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
-                return;
-            }
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Vehicle Type:</strong> <span>${vehicle.Vehicle || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Number Plate:</strong> <span>${vehicle.numberPlate || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Assigned Lane:</strong> <span>${vehicle.Assignedlane || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Token:</strong> <span>${vehicle.Token || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Price:</strong> <span>${vehicle.Price || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Completed At:</strong> <span>${vehicle.completedAt || 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+                    <strong>Status:</strong> <span>${vehicle.status || 'N/A'}</span>
+                </div>
+            </div>
             
-            // Create receipt in new window with better error handling
-            const receiptWindow = window.open('', '_blank', 'width=600,height=700');
-          
-            
-            receiptWindow.document.write(`
-                <html>
-                    <head>
-                        <title>AutoWash Pro - Receipt</title>
-                        <style>
-                            body { 
-                                font-family: Arial, sans-serif; 
-                                padding: 20px; 
-                                background: #f5f5f5;
-                            }
-                            .receipt { 
-                                background: white;
-                                border: 2px solid #00d4ff; 
-                                padding: 30px; 
-                                border-radius: 10px; 
-                                max-width: 500px;
-                                margin: 0 auto;
-                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                            }
-                            .header { 
-                                text-align: center; 
-                                margin-bottom: 25px;
-                                border-bottom: 2px solid #00d4ff;
-                                padding-bottom: 15px;
-                            }
-                            .item { 
-                                display: flex; 
-                                justify-content: space-between; 
-                                margin: 12px 0; 
-                                padding: 8px 0;
-                                border-bottom: 1px solid #eee;
-                            }
-                            .label { 
-                                font-weight: bold; 
-                                color: #333;
-                            }
-                            .value {
-                                color: #666;
-                            }
-                            button { 
-                                background: #00d4ff; 
-                                color: black; 
-                                border: none; 
-                                padding: 12px 24px; 
-                                border-radius: 5px; 
-                                cursor: pointer; 
-                                font-weight: bold;
-                                margin-top: 20px;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="receipt">
-                            <div class="header">
-                                <h2>AutoWash Pro</h2>
-                                <h3>Wash Receipt</h3>
-                                <p>Premium Vehicle Care</p>
-                            </div>
-                            <div class="item"><span class="label">Vehicle Type:</span> <span class="value">${vehicle.Vehicle || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Number Plate:</span> <span class="value">${vehicle.numberPlate || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Assigned Lane:</span> <span class="value">${vehicle.Assignedlane || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Token:</span> <span class="value">${vehicle.Token || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Price:</span> <span class="value">${vehicle.Price || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Completed At:</span> <span class="value">${vehicle.completedAt || 'N/A'}</span></div>
-                            <div class="item"><span class="label">Status:</span> <span class="value">${vehicle.status || 'N/A'}</span></div>
-                            <div style="text-align: center; margin-top: 25px;">
-                                <button onclick="window.print()">Print Receipt</button>
-                            </div>
-                        </div>
-                    </body>
-                </html>
-            `);
-            receiptWindow.document.close();
-            
-            showNotification('Receipt generated successfully!', 'success');
-            document.getElementById('receiptId').value = '';
-            
-        } catch (error) {
-            // Error is already handled in makeAuthRequest
-        }
-    });
+            <div style="text-align: center;">
+                <button onclick="window.print()" style="
+                    background: #00d4ff; 
+                    color: black; 
+                    border: none; 
+                    padding: 10px 20px; 
+                    border-radius: 5px; 
+                    cursor: pointer; 
+                    margin-right: 10px;
+                ">Print</button>
+                
+                <button onclick="this.closest('[style]').remove()" style="
+                    background: #ff6b35; 
+                    color: white; 
+                    border: none; 
+                    padding: 10px 20px; 
+                    border-radius: 5px; 
+                    cursor: pointer;
+                ">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    showNotification('Receipt generated successfully!', 'success');
+}
 
     // Update statistics
     function updateStats(vehicles) {
