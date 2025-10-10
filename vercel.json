@@ -6,7 +6,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "*.html",
+      "src": "frontend/*.html",
       "use": "@vercel/static"
     }
   ],
@@ -17,15 +17,15 @@
     },
     {
       "src": "/",
-      "dest": "/login.html"
+      "dest": "/frontend/login.html"
     },
     {
       "src": "/hello",
-      "dest": "/hello.html"
+      "dest": "/frontend/hello.html"
     },
     {
       "src": "/(.*\\.html)",
-      "dest": "/$1"
+      "dest": "/frontend/$1"
     }
   ]
 }
