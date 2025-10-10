@@ -847,10 +847,7 @@
             
             // Create receipt in new window with better error handling
             const receiptWindow = window.open('', '_blank', 'width=600,height=700');
-            if (!receiptWindow) {
-                showNotification('Please allow pop-ups to generate receipt', 'error');
-                return;
-            }
+          
             
             receiptWindow.document.write(`
                 <html>
