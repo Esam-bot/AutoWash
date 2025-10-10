@@ -564,7 +564,8 @@
     </footer>
 
    <script>
-    const API_BASE = window.location.origin + '/api/vehicles';
+    // Fixed API base URL
+    const API_BASE = '/api/vehicles';
     let allVehicles = [];
 
     // Fixed prices and wash times
@@ -582,24 +583,19 @@
 
     // Function to get auth token
     function getAuthToken() {
-        const token = localStorage.getItem('authToken');
-        console.log('Retrieved token from localStorage:', token);
-        return token;
+        return localStorage.getItem('authToken');
     }
 
-    // Function to make authenticated requests
+    // Improved authenticated request function
     async function makeAuthRequest(url, options = {}) {
         const token = getAuthToken();
-        
-        console.log('Making authenticated request to:', url);
-        console.log('Using token:', token);
         
         if (!token) {
             showNotification('Please login first', 'error');
             setTimeout(() => {
                 window.location.href = '/';
             }, 2000);
-            return null;
+            throw new Error('No authentication token');
         }
         
         const defaultOptions = {
@@ -618,11 +614,8 @@
             }
         };
         
-        console.log('Request options:', mergedOptions);
-        
         try {
             const response = await fetch(url, mergedOptions);
-            console.log('Response status:', response.status);
             
             if (response.status === 401) {
                 showNotification('Session expired. Please login again.', 'error');
@@ -630,19 +623,27 @@
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 2000);
-                return null;
+                throw new Error('Unauthorized');
+            }
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+                throw new Error(error.message || `HTTP error! status: ${response.status}`);
             }
             
             return response;
         } catch (error) {
-            console.error('Network error:', error);
-            showNotification('Network error. Please try again.', 'error');
-            return null;
+            console.error('Request failed:', error);
+            showNotification(error.message || 'Network error. Please try again.', 'error');
+            throw error;
         }
     }
 
     // Show notification
     function showNotification(message, type = 'success') {
+        // Remove existing notifications
+        document.querySelectorAll('.notification').forEach(notification => notification.remove());
+        
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.innerHTML = `
@@ -712,64 +713,57 @@
             WashTime: vehicleWashTimes[vehicleType]
         };
         
-        console.log('Adding vehicle:', formData);
-        
         try {
             const response = await makeAuthRequest(`${API_BASE}/wash`, {
                 method: 'POST',
                 body: JSON.stringify(formData)
             });
             
-            if (response && response.ok) {
-                const vehicle = await response.json();
-                showNotification('Vehicle added successfully! Token generated.', 'success');
-                
-                // Display the generated token
-                document.getElementById('tokenValue').textContent = vehicle._id;
-                document.getElementById('tokenDisplay').style.display = 'block';
-                
-                // Clear form
-                document.getElementById('numberPlate').value = '';
-                document.getElementById('vehicleType').selectedIndex = 0;
-                document.getElementById('price-display').textContent = 'Select vehicle type to see price';
-                document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
-                
-                // Refresh the vehicle list
-                loadVehicles();
-            } else if (response) {
-                const error = await response.json();
-                showNotification(`Error: ${error.message}`, 'error');
-            }
+            const vehicle = await response.json();
+            showNotification('Vehicle added successfully! Token generated.', 'success');
+            
+            // Display the generated token
+            document.getElementById('tokenValue').textContent = vehicle._id || vehicle.id;
+            document.getElementById('tokenDisplay').style.display = 'block';
+            
+            // Clear form
+            document.getElementById('numberPlate').value = '';
+            document.getElementById('vehicleType').selectedIndex = 0;
+            document.getElementById('price-display').textContent = 'Select vehicle type to see price';
+            document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
+            
+            // Refresh the vehicle list
+            await loadVehicles();
+            
         } catch (error) {
-            showNotification('Network error. Please try again.', 'error');
-            console.error('Error:', error);
+            // Error is already handled in makeAuthRequest
         }
     });
-
 
     // Load all vehicles
     let currentTab = 'pending';
     async function loadVehicles() {
         try {
+            console.log('Loading vehicles from:', API_BASE);
             const response = await makeAuthRequest(`${API_BASE}/wash`);
-            if (response && response.ok) {
-                const vehicles = await response.json();
-                allVehicles = vehicles;
-                updateStats(vehicles);
-                renderQueue(currentTab);
-            } else if (response) {
-                showNotification('Error loading vehicles', 'error');
-            }
+            const vehicles = await response.json();
+            
+            console.log('Vehicles loaded:', vehicles);
+            allVehicles = Array.isArray(vehicles) ? vehicles : [];
+            updateStats(allVehicles);
+            renderQueue(currentTab);
+            
         } catch (error) {
-            showNotification('Network error. Please try again.', 'error');
-            console.error('Error:', error);
+            console.error('Failed to load vehicles:', error);
+            allVehicles = [];
+            updateStats([]);
+            renderQueue(currentTab);
         }
     }
 
     // Render the queue
     function renderQueue(tabName) {
-        currentTab=tabName
-
+        currentTab = tabName;
         let vehiclesToShow = [];
         
         switch(tabName) {
@@ -800,15 +794,15 @@
             <div class="vehicle-item ${vehicle.status === 'completed' ? 'completed' : ''}">
                 <div class="vehicle-info">
                     <h3>${vehicle.Vehicle} - ${vehicle.numberPlate}</h3>
-                    <p>Lane: ${vehicle.Assignedlane} | Price: ${vehicle.Price}</p>
-                    <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token} |  ID: ${vehicle._id}</p>
+                    <p>Lane: ${vehicle.Assignedlane || 'Not assigned'} | Price: ${vehicle.Price}</p>
+                    <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token || 'N/A'} | ID: ${vehicle._id || vehicle.id}</p>
                     <span class="status-badge ${vehicle.status === 'pending' ? 'status-pending' : 'status-completed'}">
                         ${vehicle.status}
                     </span>
                 </div>
                 <div class="vehicle-actions">
                     ${vehicle.status === 'pending' ? 
-                        `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id}')">
+                        `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id || vehicle.id}')">
                             Mark as Completed
                         </button>` : 
                         '<button class="complete-btn" disabled>Completed</button>'
@@ -825,22 +819,18 @@
                 method: 'PATCH'
             });
             
-            if (response && response.ok) {
-                showNotification('Vehicle marked as completed!', 'success');
-                loadVehicles();
-            } else if (response) {
-                const error = await response.json();
-                showNotification(`Error: ${error.message}`, 'error');
-            }
+            await response.json();
+            showNotification('Vehicle marked as completed!', 'success');
+            await loadVehicles();
+            
         } catch (error) {
-            showNotification('Network error. Please try again.', 'error');
-            console.error('Error:', error);
+            // Error is already handled in makeAuthRequest
         }
     }
 
     // Generate receipt
     document.getElementById('getReceiptBtn').addEventListener('click', async function() {
-        const vehicleId = document.getElementById('receiptId').value;
+        const vehicleId = document.getElementById('receiptId').value.trim();
         if (!vehicleId) {
             showNotification('Please enter a vehicle ID', 'error');
             return;
@@ -848,59 +838,99 @@
         
         try {
             const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
+            const vehicle = await response.json();
             
-            if (response && response.ok) {
-                const vehicle = await response.json();
-                
-                if (vehicle.message === 'Vehicle not washed yet!') {
-                    showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
-                    return;
-                }
-                
-                // Create receipt in new window
-                const receiptWindow = window.open('', '_blank', 'width=600,height=700');
-                receiptWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>AutoWash Pro - Receipt</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; padding: 20px; }
-                                .receipt { border: 2px solid #00d4ff; padding: 20px; border-radius: 10px; }
-                                .header { text-align: center; margin-bottom: 20px; }
-                                .item { display: flex; justify-content: space-between; margin: 10px 0; }
-                                .label { font-weight: bold; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="receipt">
-                                <div class="header">
-                                    <h2>AutoWash Pro</h2>
-                                    <h3>Wash Receipt</h3>
-                                </div>
-                                <div class="item"><span class="label">Vehicle Type:</span> <span>${vehicle.Vehicle}</span></div>
-                                <div class="item"><span class="label">Number Plate:</span> <span>${vehicle.numberPlate}</span></div>
-                                <div class="item"><span class="label">Assigned Lane:</span> <span>${vehicle.Assignedlane}</span></div>
-                                <div class="item"><span class="label">Token:</span> <span>${vehicle.Token}</span></div>
-                                <div class="item"><span class="label">Price:</span> <span>${vehicle.Price}</span></div>
-                                <div class="item"><span class="label">Completed AT::</span> <span>${vehicle.completedAt}</span></div>
-                                <div class="item"><span class="label">Status:</span> <span>${vehicle.status}</span></div>
-                                <div style="text-align: center; margin-top: 20px;">
-                                    <button onclick="window.print()">Print Receipt</button>
-                                </div>
-                            </div>
-                        </body>
-                    </html>
-                `);
-                receiptWindow.document.close();
-                
-                showNotification('Receipt generated successfully!', 'success');
-            } else if (response) {
-                const error = await response.json();
-                showNotification(`Error: ${error.message}`, 'error');
+            if (vehicle.message === 'Vehicle not washed yet!') {
+                showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
+                return;
             }
+            
+            // Create receipt in new window with better error handling
+            const receiptWindow = window.open('', '_blank', 'width=600,height=700');
+            if (!receiptWindow) {
+                showNotification('Please allow pop-ups to generate receipt', 'error');
+                return;
+            }
+            
+            receiptWindow.document.write(`
+                <html>
+                    <head>
+                        <title>AutoWash Pro - Receipt</title>
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                padding: 20px; 
+                                background: #f5f5f5;
+                            }
+                            .receipt { 
+                                background: white;
+                                border: 2px solid #00d4ff; 
+                                padding: 30px; 
+                                border-radius: 10px; 
+                                max-width: 500px;
+                                margin: 0 auto;
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                            }
+                            .header { 
+                                text-align: center; 
+                                margin-bottom: 25px;
+                                border-bottom: 2px solid #00d4ff;
+                                padding-bottom: 15px;
+                            }
+                            .item { 
+                                display: flex; 
+                                justify-content: space-between; 
+                                margin: 12px 0; 
+                                padding: 8px 0;
+                                border-bottom: 1px solid #eee;
+                            }
+                            .label { 
+                                font-weight: bold; 
+                                color: #333;
+                            }
+                            .value {
+                                color: #666;
+                            }
+                            button { 
+                                background: #00d4ff; 
+                                color: black; 
+                                border: none; 
+                                padding: 12px 24px; 
+                                border-radius: 5px; 
+                                cursor: pointer; 
+                                font-weight: bold;
+                                margin-top: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="receipt">
+                            <div class="header">
+                                <h2>AutoWash Pro</h2>
+                                <h3>Wash Receipt</h3>
+                                <p>Premium Vehicle Care</p>
+                            </div>
+                            <div class="item"><span class="label">Vehicle Type:</span> <span class="value">${vehicle.Vehicle || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Number Plate:</span> <span class="value">${vehicle.numberPlate || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Assigned Lane:</span> <span class="value">${vehicle.Assignedlane || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Token:</span> <span class="value">${vehicle.Token || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Price:</span> <span class="value">${vehicle.Price || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Completed At:</span> <span class="value">${vehicle.completedAt || 'N/A'}</span></div>
+                            <div class="item"><span class="label">Status:</span> <span class="value">${vehicle.status || 'N/A'}</span></div>
+                            <div style="text-align: center; margin-top: 25px;">
+                                <button onclick="window.print()">Print Receipt</button>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+            `);
+            receiptWindow.document.close();
+            
+            showNotification('Receipt generated successfully!', 'success');
+            document.getElementById('receiptId').value = '';
+            
         } catch (error) {
-            showNotification('Network error. Please try again.', 'error');
-            console.error('Error:', error);
+            // Error is already handled in makeAuthRequest
         }
     });
 
@@ -915,10 +945,9 @@
         document.getElementById('completed-vehicles').textContent = completed;
     }
 
-    // Check authentication on page load
+    // Check authentication and initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         const token = getAuthToken();
-        console.log('Dashboard loaded, token:', token);
         
         if (!token) {
             showNotification('Please login to access dashboard', 'error');
@@ -928,17 +957,13 @@
             return;
         }
         
-        console.log('User authenticated, loading vehicles...');
-
-        document.getElementById('pendingTab')?.addEventListener('click', () => renderQueue('pending'));
-        document.getElementById('completedTab')?.addEventListener('click', () => renderQueue('completed'));
-        document.getElementById('allTab')?.addEventListener('click', () => renderQueue('all'));
-        
-        // Auto-refresh every 10 seconds
-        setInterval(loadVehicles, 10000);
+        console.log('Dashboard initialized, loading vehicles...');
         
         // Initial load
         loadVehicles();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(loadVehicles, 10000);
     });
 
     // Add logout functionality
@@ -947,7 +972,7 @@
         window.location.href = '/';
     }
 
-    // Add logout button to header (optional)
+    // Add logout button to header
     document.addEventListener('DOMContentLoaded', function() {
         const header = document.querySelector('header');
         const logoutBtn = document.createElement('button');
@@ -956,15 +981,17 @@
             background: var(--accent-orange);
             color: var(--black);
             border: none;
-            padding: 8px 16px;
+            padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
+            margin-left: auto;
         `;
         logoutBtn.onclick = logout;
         
         header.appendChild(logoutBtn);
     });
 </script>
+    
 </body>
 </html>
