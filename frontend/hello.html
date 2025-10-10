@@ -564,7 +564,7 @@
     </footer>
 
    <script>
-    const API_BASE = '/api/vehicles';
+    const API_BASE = window.location.origin + '/api/vehicles';
     let allVehicles = [];
 
     // Fixed prices and wash times
@@ -745,7 +745,7 @@
             console.error('Error:', error);
         }
     });
-    
+
 
     // Load all vehicles
     let currentTab = 'pending';
