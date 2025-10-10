@@ -16,8 +16,16 @@
       "dest": "/index.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "src": "/",
+      "dest": "/login.html"
+    },
+    {
+      "src": "/hello",
+      "dest": "/hello.html"
+    },
+    {
+      "src": "/(.*\\.html)",
+      "dest": "/$1"
     }
   ]
 }
