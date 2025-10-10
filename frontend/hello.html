@@ -829,7 +829,7 @@
     }
 
     // Generate receipt
-    document.getElementById('getReceiptBtn').addEventListener('click', async function() {
+   document.getElementById('getReceiptBtn').addEventListener('click', async function() {
     const vehicleId = document.getElementById('receiptId').value.trim();
     if (!vehicleId) {
         showNotification('Please enter a vehicle ID', 'error');
@@ -845,8 +845,8 @@
             return;
         }
         
-        // SIMPLE SOLUTION: Always use modal/popup instead of checking device type
-        showReceiptModal(vehicle);
+        // Generate receipt in new tab - works on all devices
+        generateReceipt(vehicle);
         document.getElementById('receiptId').value = '';
         
     } catch (error) {
@@ -854,87 +854,205 @@
     }
 });
 
-// Simple modal function that works everywhere
-function showReceiptInNewTab(vehicle) {
-    // Create a simple popup/modal
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.8);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-    `;
-    
-    modal.innerHTML = `
-        <div style="
-            background: white; 
-            padding: 25px; 
-            border-radius: 10px; 
-            max-width: 500px; 
-            width: 100%;
-            color: black;
-        ">
-            <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #333;">AutoWash Pro</h2>
-                <h3 style="margin: 10px 0; color: #666;">Wash Receipt</h3>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Vehicle Type:</strong> <span>${vehicle.Vehicle || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Number Plate:</strong> <span>${vehicle.numberPlate || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Assigned Lane:</strong> <span>${vehicle.Assignedlane || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Token:</strong> <span>${vehicle.Token || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Price:</strong> <span>${vehicle.Price || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Completed At:</strong> <span>${vehicle.completedAt || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0;">
-                    <strong>Status:</strong> <span>${vehicle.status || 'N/A'}</span>
-                </div>
-            </div>
-            
-            <div style="text-align: center;">
-                <button onclick="window.print()" style="
+// Simple function to generate receipt in new tab
+function generateReceipt(vehicle) {
+    // Create a complete HTML page for the receipt
+    const receiptHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>AutoWash Pro - Receipt</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    padding: 20px; 
+                    background: #f5f5f5;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .receipt { 
+                    background: white;
+                    border: 2px solid #00d4ff; 
+                    padding: 25px; 
+                    border-radius: 15px; 
+                    max-width: 500px;
+                    width: 100%;
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+                }
+                .header { 
+                    text-align: center; 
+                    margin-bottom: 25px;
+                    border-bottom: 2px solid #00d4ff;
+                    padding-bottom: 15px;
+                }
+                .header h2 {
+                    color: #333;
+                    margin-bottom: 5px;
+                    font-size: 1.8rem;
+                }
+                .header h3 {
+                    color: #666;
+                    margin-bottom: 5px;
+                    font-size: 1.3rem;
+                }
+                .header p {
+                    color: #999;
+                    font-size: 0.9rem;
+                }
+                .item { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    margin: 15px 0; 
+                    padding: 10px 0;
+                    border-bottom: 1px solid #eee;
+                }
+                .label { 
+                    font-weight: bold; 
+                    color: #333;
+                    font-size: 1rem;
+                }
+                .value {
+                    color: #666;
+                    font-size: 1rem;
+                    text-align: right;
+                }
+                .print-btn { 
                     background: #00d4ff; 
                     color: black; 
                     border: none; 
-                    padding: 10px 20px; 
-                    border-radius: 5px; 
+                    padding: 15px 30px; 
+                    border-radius: 8px; 
                     cursor: pointer; 
-                    margin-right: 10px;
-                ">Print</button>
+                    font-weight: bold;
+                    margin-top: 25px;
+                    font-size: 1.1rem;
+                    width: 100%;
+                    transition: all 0.3s;
+                }
+                .print-btn:hover {
+                    background: #00b8e6;
+                    transform: translateY(-2px);
+                }
+                @media print {
+                    body { 
+                        background: white; 
+                        padding: 0;
+                    }
+                    .receipt { 
+                        box-shadow: none;
+                        border: 1px solid #000;
+                    }
+                    .print-btn { 
+                        display: none; 
+                    }
+                }
+                @media (max-width: 600px) {
+                    body {
+                        padding: 10px;
+                    }
+                    .receipt {
+                        padding: 20px;
+                    }
+                    .header h2 {
+                        font-size: 1.5rem;
+                    }
+                    .header h3 {
+                        font-size: 1.1rem;
+                    }
+                    .item {
+                        flex-direction: column;
+                        gap: 5px;
+                    }
+                    .value {
+                        text-align: left;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="receipt">
+                <div class="header">
+                    <h2>AutoWash Pro</h2>
+                    <h3>Wash Receipt</h3>
+                    <p>Premium Vehicle Care</p>
+                </div>
                 
-                <button onclick="this.closest('[style]').remove()" style="
-                    background: #ff6b35; 
-                    color: white; 
-                    border: none; 
-                    padding: 10px 20px; 
-                    border-radius: 5px; 
-                    cursor: pointer;
-                ">Close</button>
+                <div class="item">
+                    <span class="label">Vehicle Type:</span>
+                    <span class="value">${vehicle.Vehicle || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Number Plate:</span>
+                    <span class="value">${vehicle.numberPlate || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Assigned Lane:</span>
+                    <span class="value">${vehicle.Assignedlane || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Token:</span>
+                    <span class="value">${vehicle.Token || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Price:</span>
+                    <span class="value">${vehicle.Price || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Completed At:</span>
+                    <span class="value">${vehicle.completedAt || 'N/A'}</span>
+                </div>
+                
+                <div class="item">
+                    <span class="label">Status:</span>
+                    <span class="value">${vehicle.status || 'N/A'}</span>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="print-btn" onclick="window.print()">
+                        🖨️ Print Receipt
+                    </button>
+                    <p style="margin-top: 15px; color: #666; font-size: 0.9rem;">
+                        Tip: Use browser's print option or press Ctrl+P
+                    </p>
+                </div>
             </div>
-        </div>
+            
+            <script>
+                // Auto-focus on print button for better UX
+                window.onload = function() {
+                    const printBtn = document.querySelector('.print-btn');
+                    if (printBtn) {
+                        printBtn.focus();
+                    }
+                }
+            </script>
+        </body>
+        </html>
     `;
     
-    document.body.appendChild(modal);
-    showNotification('Receipt generated successfully!', 'success');
+    // Open receipt in new tab - works on all devices
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+        receiptWindow.document.write(receiptHTML);
+        receiptWindow.document.close();
+        showNotification('Receipt opened in new tab!', 'success');
+    } else {
+        // Fallback: If new tab is blocked, show alert
+        showNotification('Please allow pop-ups to view receipt', 'error');
+    }
 }
 
     // Update statistics
