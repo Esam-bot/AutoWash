@@ -14,6 +14,19 @@ app.use(express.static(path.join(__dirname, 'frontend')))
 
 const sessions = new Map() //keep track of tokens
 
+function checkTokenExpiry(token) {
+    const session = sessions.get(token);
+    
+    if (!session) return false; // Token doesn't exist
+    
+    if (Date.now() > session.expiresAt) {
+        sessions.delete(token); // Auto-cleanup expired token
+        return false; // Token expired
+    }
+    
+    return true; // Token valid
+}
+
 // Authentication middleware
 function requireAuth(req, res, next) {
     console.log('Authorization header:', req.headers.authorization);
@@ -29,7 +42,8 @@ function requireAuth(req, res, next) {
     
     console.log('Extracted token:', token);
     
-    if (token && sessions.has(token)) {
+    //Check token expiry
+    if (token && checkTokenExpiry(token)) {
         req.user = sessions.get(token);
         next();
     } else {
@@ -61,10 +75,12 @@ app.post('/api/login', (req, res) => {
     
     if (username === 'EsamAzam' && password === 'april2004') {
         const token = 'auth-' + Date.now();
+        const expiryTime = Date.now() + (1 * 60 * 60 * 1000); // 1 hours from now
         sessions.set(token, { 
             username, 
             loginTime: new Date(),
-            role: 'admin'
+            role: 'admin',
+            expiresAt: expiryTime  // ADDED: Token expire
         });
         
         console.log('Login successful, token generated:', token);
