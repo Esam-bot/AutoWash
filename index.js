@@ -10,19 +10,17 @@ app.use(cors())
 app.use(express.json())
 
 // Serve static files from frontend directory
-app.use(express.static(path.join(__dirname, 'frontend'), {
-    fallthrough: true // Allow falling through to routes if file not found
-}))
+app.use(express.static(path.join(__dirname, 'frontend')))
 
-const sessions = new Map()
+const sessions = new Map() //keep track of tokens
 
-// Improved authentication middleware
+// Authentication middleware
 function requireAuth(req, res, next) {
     console.log('Authorization header:', req.headers.authorization);
     
     const authHeader = req.headers.authorization;
-    let token;
     
+    let token;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
     } else {
@@ -42,10 +40,13 @@ function requireAuth(req, res, next) {
 // Import routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
 
-// MongoDB connection (remove deprecated options)
+// MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0';
 
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})    
 .then(() => {
     console.log('MongoDB CONNECTED successfully')
 })
@@ -86,16 +87,16 @@ app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
 // Logout endpoint
 app.post('/api/logout', requireAuth, (req, res) => {
-    const authHeader = req.headers.authorization;
-    let token;
+    const token = req.headers.authorization;
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
+    let actualToken;
+    if (token && token.startsWith('Bearer ')) {
+        actualToken = token.substring(7);
     } else {
-        token = authHeader;
+        actualToken = token;
     }
     
-    sessions.delete(token);
+    sessions.delete(actualToken);
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -104,7 +105,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
 });
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard' ,(req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
 });
 
@@ -117,7 +118,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// FIXED: Catch-all route - serve login page for any other route
+// Catch-all route - serve login page for any other route
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
 });
