@@ -10,17 +10,19 @@ app.use(cors())
 app.use(express.json())
 
 // Serve static files from frontend directory
-app.use(express.static(path.join(__dirname, 'frontend')))
+app.use(express.static(path.join(__dirname, 'frontend'), {
+    fallthrough: true // Allow falling through to routes if file not found
+}))
 
-const sessions = new Map() //keep track of tokens
+const sessions = new Map()
 
-// Authentication middleware
+// Improved authentication middleware
 function requireAuth(req, res, next) {
     console.log('Authorization header:', req.headers.authorization);
     
     const authHeader = req.headers.authorization;
-    
     let token;
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
     } else {
@@ -40,13 +42,10 @@ function requireAuth(req, res, next) {
 // Import routes
 const vehicleRoutes = require('./routes/vehicleRoutes')
 
-// MongoDB connection
+// MongoDB connection (remove deprecated options)
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0';
 
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})    
+mongoose.connect(MONGODB_URI)
 .then(() => {
     console.log('MongoDB CONNECTED successfully')
 })
@@ -87,16 +86,16 @@ app.use('/api/vehicles', requireAuth, vehicleRoutes)
 
 // Logout endpoint
 app.post('/api/logout', requireAuth, (req, res) => {
-    const token = req.headers.authorization;
+    const authHeader = req.headers.authorization;
+    let token;
     
-    let actualToken;
-    if (token && token.startsWith('Bearer ')) {
-        actualToken = token.substring(7);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
     } else {
-        actualToken = token;
+        token = authHeader;
     }
     
-    sessions.delete(actualToken);
+    sessions.delete(token);
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -105,7 +104,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
 });
 
-app.get('/dashboard' ,(req, res) => {
+app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'hello.html'));
 });
 
@@ -118,7 +117,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Catch-all route - serve login page for any other route
+// FIXED: Catch-all route - serve login page for any other route
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
 });
