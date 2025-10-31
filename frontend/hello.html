@@ -562,338 +562,298 @@
     <footer>
         <p>AutoWash Pro Car Wash Management System &copy; 2023 | Premium Vehicle Care</p>
     </footer>
-<script>
-    // vehicleController.js - Backend Integration Script
-const API_BASE = '/api/vehicles';
-let allVehicles = [];
 
-// Vehicle configuration matching backend logic
-const vehicleConfig = {
-    'Car': {
-        price: '500PKR for Car',
-        washTime: '15Min for Car',
-        washMinutes: 15
-    },
-    'Bike': {
-        price: '300PKR for Bike',
-        washTime: '10Min for Bike', 
-        washMinutes: 10
-    },
-    'Truck': {
-        price: '800PKR for Truck',
-        washTime: '20Min for Truck',
-        washMinutes: 20
-    }
-};
+    <script>
+    const API_BASE = '/api/vehicles';
+    let allVehicles = [];
 
-// Function to get auth token
-function getAuthToken() {
-    return localStorage.getItem('authToken');
-}
-
-// Function to make authenticated requests
-async function makeAuthRequest(url, options = {}) {
-    const token = getAuthToken();
-    
-    if (!token) {
-        showNotification('Please login first', 'error');
-        setTimeout(() => {
-            window.location.href = '/';
-        }, 2000);
-        throw new Error('No authentication token');
-    }
-    
-    const defaultOptions = {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        }
+    // Fixed prices and wash times
+    const vehiclePrices = {
+        'Car': '500PKR for Car',
+        'Bike': '300PKR for Bike', 
+        'Truck': '800PKR for Truck'
     };
-    
-    const mergedOptions = {
-        ...defaultOptions,
-        ...options,
-        headers: {
-            ...defaultOptions.headers,
-            ...options.headers
-        }
+
+    const vehicleWashTimes = {
+        'Car': '15Min for Car',
+        'Bike': '10Min for Bike',
+        'Truck': '20Min for Truck'
     };
-    
-    try {
-        const response = await fetch(url, mergedOptions);
+
+    // Function to get auth token
+    function getAuthToken() {
+        return localStorage.getItem('authToken');
+    }
+
+    // Function to make authenticated requests
+    async function makeAuthRequest(url, options = {}) {
+        const token = getAuthToken();
         
-        if (response.status === 401) {
-            showNotification('Session expired. Please login again.', 'error');
-            localStorage.removeItem('authToken');
+        if (!token) {
+            showNotification('Please login first', 'error');
             setTimeout(() => {
                 window.location.href = '/';
             }, 2000);
-            throw new Error('Unauthorized');
+            throw new Error('No authentication token');
         }
         
-        const contentType = response.headers.get('content-type');
-        let data;
-        
-        if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
-        } else {
-            const text = await response.text();
-            throw new Error(text || `HTTP error! status: ${response.status}`);
-        }
-        
-        if (!response.ok) {
-            throw new Error(data.message || `HTTP error! status: ${response.status}`);
-        }
-        
-        return data;
-    } catch (error) {
-        console.error('Request failed:', error);
-        showNotification(error.message || 'Network error. Please try again.', 'error');
-        throw error;
-    }
-}
-
-// Show notification
-function showNotification(message, type = 'success') {
-    document.querySelectorAll('.notification').forEach(notification => notification.remove());
-    
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-        <span>${message}</span>
-    `;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
-}
-
-// Update price and time display when vehicle type changes
-function initializeVehicleTypeListener() {
-    const vehicleTypeSelect = document.getElementById('vehicleType');
-    if (vehicleTypeSelect) {
-        vehicleTypeSelect.addEventListener('change', function() {
-            const selectedType = this.value;
-            const priceDisplay = document.getElementById('price-display');
-            const timeDisplay = document.getElementById('time-display');
-            
-            if (selectedType && vehicleConfig[selectedType]) {
-                priceDisplay.textContent = vehicleConfig[selectedType].price;
-                timeDisplay.textContent = vehicleConfig[selectedType].washTime;
-            } else {
-                priceDisplay.textContent = 'Select vehicle type to see price';
-                timeDisplay.textContent = 'Select vehicle type to see wash time';
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             }
-        });
+        };
+        
+        const mergedOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers
+            }
+        };
+        
+        try {
+            const response = await fetch(url, mergedOptions);
+            
+            if (response.status === 401) {
+                showNotification('Session expired. Please login again.', 'error');
+                localStorage.removeItem('authToken');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                throw new Error('Unauthorized');
+            }
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+                throw new Error(error.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('Request failed:', error);
+            showNotification(error.message || 'Network error. Please try again.', 'error');
+            throw error;
+        }
     }
-}
 
-// Show active tab
-function showTab(tabName) {
-    document.querySelectorAll('.queue-tab').forEach(tab => {
-        tab.classList.remove('active');
+    // Show notification
+    function showNotification(message, type = 'success') {
+        // Remove existing notifications
+        document.querySelectorAll('.notification').forEach(notification => notification.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    // Update price and time display when vehicle type changes
+    document.getElementById('vehicleType').addEventListener('change', function() {
+        const selectedType = this.value;
+        const priceDisplay = document.getElementById('price-display');
+        const timeDisplay = document.getElementById('time-display');
+        
+        if (selectedType && vehiclePrices[selectedType]) {
+            priceDisplay.textContent = vehiclePrices[selectedType];
+            timeDisplay.textContent = vehicleWashTimes[selectedType];
+        } else {
+            priceDisplay.textContent = 'Select vehicle type to see price';
+            timeDisplay.textContent = 'Select vehicle type to see wash time';
+        }
     });
-    
-    event.target.classList.add('active');
-    renderQueue(tabName);
-}
 
-// Validate number plate format
-function validateNumberPlate(plate) {
-    const pattern = /^[A-Z]{2,3}-\d{1,4}$/;
-    return pattern.test(plate);
-}
-
-// Add new vehicle - Matches backend field names exactly
-async function addVehicle() {
-    const vehicleType = document.getElementById('vehicleType').value;
-    const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
-    
-    if (!vehicleType || !numberPlate) {
-        showNotification('Please fill all fields', 'error');
-        return;
-    }
-
-    if (!validateNumberPlate(numberPlate)) {
-        showNotification('Invalid number plate format! Use format like: ABC-123 or XYZ-1234', 'error');
-        return;
-    }    
-    
-    // Data structure matches backend expectations exactly
-    const formData = {
-        vehicle: vehicleType,                    // Matches backend 'vehicle'
-        number_plate: numberPlate,               // Matches backend 'number_plate'
-        assigned_lane: 1,                        // Matches backend 'assigned_lane'
-        price: vehicleConfig[vehicleType].price, // Matches backend 'price'
-        wash_time: vehicleConfig[vehicleType].washTime // Matches backend 'wash_time'
-    };
-    
-    try {
-        const vehicle = await makeAuthRequest(`${API_BASE}/wash`, {
-            method: 'POST',
-            body: JSON.stringify(formData)
+    // Show active tab
+    function showTab(tabName) {
+        // Remove active class from all tabs
+        document.querySelectorAll('.queue-tab').forEach(tab => {
+            tab.classList.remove('active');
         });
         
-        showNotification('Vehicle added successfully! Token: ' + vehicle.token, 'success');
+        // Add active class to clicked tab
+        event.target.classList.add('active');
         
-        // Display the generated token (matches backend token format)
-        document.getElementById('tokenValue').textContent = vehicle.token;
-        document.getElementById('tokenDisplay').style.display = 'block';
-        
-        // Clear form
-        document.getElementById('numberPlate').value = '';
-        document.getElementById('vehicleType').selectedIndex = 0;
-        document.getElementById('price-display').textContent = 'Select vehicle type to see price';
-        document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
-        
-        // Refresh the vehicle list
-        await loadVehicles();
-        
-    } catch (error) {
-        console.error('Error adding vehicle:', error);
+        // Render the appropriate list
+        renderQueue(tabName);
     }
-}
 
-// Load all vehicles from backend
-let currentTab = 'pending';
-async function loadVehicles() {
-    try {
-        const vehicles = await makeAuthRequest(`${API_BASE}/wash`);
-        
-        allVehicles = Array.isArray(vehicles) ? vehicles : [];
-        updateStats(allVehicles);
-        renderQueue(currentTab);
-        
-    } catch (error) {
-        console.error('Failed to load vehicles:', error);
-        showNotification('Failed to load vehicles: ' + error.message, 'error');
-        allVehicles = [];
-        updateStats([]);
-        renderQueue(currentTab);
+    function validateNumberPlate(plate) {
+        const pattern = /^[A-Z]{2,3}-\d{1,4}$/;
+        return pattern.test(plate);
     }
-}
 
-// Render the queue with backend field names
-function renderQueue(tabName) {
-    currentTab = tabName;
-    let vehiclesToShow = [];
-    
-    switch(tabName) {
-        case 'pending':
-            vehiclesToShow = allVehicles.filter(v => v.status === 'pending');
-            break;
-        case 'completed':
-            vehiclesToShow = allVehicles.filter(v => v.status === 'completed');
-            break;
-        case 'all':
-            vehiclesToShow = allVehicles;
-            break;
-    }
-    
-    const container = document.getElementById('pendingVehicleList');
-    
-    if (vehiclesToShow.length === 0) {
-        container.innerHTML = `
-            <div class="empty-queue">
-                <i class="fas fa-${tabName === 'pending' ? 'clock' : 'check-circle'}"></i>
-                <p>No ${tabName} vehicles</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = vehiclesToShow.map(vehicle => {
-        const vehicleType = vehicle.vehicle || 'Unknown';
-        const licensePlate = vehicle.number_plate || 'Unknown';
-        const price = vehicle.price || 'Unknown';
-        const washTime = vehicle.wash_time || 'Unknown';
-        const vehicleId = vehicle.id || 'Unknown';
-        const status = vehicle.status || 'unknown';
-        const assignedLane = vehicle.assigned_lane || 'Not assigned';
-        const token = vehicle.token || 'N/A';
-        const estimatedCompletion = vehicle.estimated_completion_time ? 
-            new Date(vehicle.estimated_completion_time).toLocaleTimeString() : 'N/A';
+    // Add new vehicle
+    document.getElementById('addVehicleBtn').addEventListener('click', async function() {
+        const vehicleType = document.getElementById('vehicleType').value;
+        const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
         
-        return `
-        <div class="vehicle-item ${status === 'completed' ? 'completed' : ''}">
-            <div class="vehicle-info">
-                <h3>${vehicleType} - ${licensePlate}</h3>
-                <p>Lane: ${assignedLane} | Price: ${price}</p>
-                <p>Time: ${washTime} | Token: ${token}</p>
-                <p>Est. Completion: ${estimatedCompletion} | ID: ${vehicleId}</p>
-                <span class="status-badge ${status === 'pending' ? 'status-pending' : 'status-completed'}">
-                    ${status}
-                </span>
-            </div>
-            <div class="vehicle-actions">
-                ${status === 'pending' ? 
-                    `<button class="complete-btn" onclick="markAsCompleted('${vehicleId}')">
-                        Mark as Completed
-                    </button>` : 
-                    '<button class="complete-btn" disabled>Completed</button>'
-                }
-            </div>
-        </div>
-        `;
-    }).join('');
-}
+        if (!vehicleType || !numberPlate) {
+            showNotification('Please fill all fields', 'error');
+            return;
+        }
 
-// Mark vehicle as completed - matches backend PATCH endpoint
-async function markAsCompleted(vehicleId) {
-    try {
-        await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
-            method: 'PATCH'
-        });
+        if (!validateNumberPlate(numberPlate)) {
+            showNotification('Invalid number plate format! Use format like: ABC-123 or XYZ-1234', 'error');
+            return;
+        }    
         
-        showNotification('Vehicle marked as completed!', 'success');
-        await loadVehicles();
+        const formData = {
+            Vehicle: vehicleType,
+            numberPlate: numberPlate,
+            Price: vehiclePrices[vehicleType],
+            WashTime: vehicleWashTimes[vehicleType]
+        };
         
-    } catch (error) {
-        console.error('Error marking vehicle as completed:', error);
-        showNotification('Failed to mark vehicle as completed: ' + error.message, 'error');
-    }
-}
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash`, {
+                method: 'POST',
+                body: JSON.stringify(formData)
+            });
+            
+            const vehicle = await response.json();
+            showNotification('Vehicle added successfully! Token generated.', 'success');
+            
+            // Display the generated token
+            document.getElementById('tokenValue').textContent = vehicle._id || vehicle.id;
+            document.getElementById('tokenDisplay').style.display = 'block';
+            
+            // Clear form
+            document.getElementById('numberPlate').value = '';
+            document.getElementById('vehicleType').selectedIndex = 0;
+            document.getElementById('price-display').textContent = 'Select vehicle type to see price';
+            document.getElementById('time-display').textContent = 'Select vehicle type to see wash time';
+            
+            // Refresh the vehicle list
+            await loadVehicles();
+            
+        } catch (error) {
+            // Error is already handled in makeAuthRequest
+        }
+    });
 
-// Generate receipt - matches backend receipt endpoint
-async function generateReceipt() {
-    const vehicleId = document.getElementById('receiptId').value.trim();
-    if (!vehicleId) {
-        showNotification('Please enter a vehicle ID', 'error');
-        return;
+    // Load all vehicles
+    let currentTab = 'pending';
+    async function loadVehicles() {
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash`);
+            const vehicles = await response.json();
+            
+            allVehicles = Array.isArray(vehicles) ? vehicles : [];
+            updateStats(allVehicles);
+            renderQueue(currentTab);
+            
+        } catch (error) {
+            console.error('Failed to load vehicles:', error);
+            allVehicles = [];
+            updateStats([]);
+            renderQueue(currentTab);
+        }
     }
-    
-    try {
-        const vehicle = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
+
+    // Render the queue
+    function renderQueue(tabName) {
+        currentTab = tabName;
+        let vehiclesToShow = [];
         
-        if (vehicle.message === 'Vehicle not washed yet!') {
-            showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
+        switch(tabName) {
+            case 'pending':
+                vehiclesToShow = allVehicles.filter(v => v.status === 'pending');
+                break;
+            case 'completed':
+                vehiclesToShow = allVehicles.filter(v => v.status === 'completed');
+                break;
+            case 'all':
+                vehiclesToShow = allVehicles;
+                break;
+        }
+        
+        const container = document.getElementById('pendingVehicleList');
+        
+        if (vehiclesToShow.length === 0) {
+            container.innerHTML = `
+                <div class="empty-queue">
+                    <i class="fas fa-${tabName === 'pending' ? 'clock' : 'check-circle'}"></i>
+                    <p>No ${tabName} vehicles</p>
+                </div>
+            `;
             return;
         }
         
-        // Generate receipt popup
-        showReceiptPopup(vehicle);
-        document.getElementById('receiptId').value = '';
-        
-    } catch (error) {
-        console.error('Error generating receipt:', error);
-        showNotification('Failed to generate receipt: ' + error.message, 'error');
+        container.innerHTML = vehiclesToShow.map(vehicle => `
+            <div class="vehicle-item ${vehicle.status === 'completed' ? 'completed' : ''}">
+                <div class="vehicle-info">
+                    <h3>${vehicle.Vehicle} - ${vehicle.numberPlate}</h3>
+                    <p>Lane: ${vehicle.Assignedlane || 'Not assigned'} | Price: ${vehicle.Price}</p>
+                    <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token || 'N/A'} | ID: ${vehicle._id || vehicle.id}</p>
+                    <span class="status-badge ${vehicle.status === 'pending' ? 'status-pending' : 'status-completed'}">
+                        ${vehicle.status}
+                    </span>
+                </div>
+                <div class="vehicle-actions">
+                    ${vehicle.status === 'pending' ? 
+                        `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id || vehicle.id}')">
+                            Mark as Completed
+                        </button>` : 
+                        '<button class="complete-btn" disabled>Completed</button>'
+                    }
+                </div>
+            </div>
+        `).join('');
     }
-}
 
-// Show receipt in popup window
-function showReceiptPopup(vehicle) {
-    const vehicleType = vehicle.vehicle || 'N/A';
-    const licensePlate = vehicle.number_plate || 'N/A';
-    const price = vehicle.price || 'N/A';
-    const washTime = vehicle.wash_time || 'N/A';
-    const completedAt = vehicle.completed_at ? new Date(vehicle.completed_at).toLocaleString() : 'N/A';
-    const status = vehicle.status || 'N/A';
-    const token = vehicle.token || 'N/A';
-    const assignedLane = vehicle.assigned_lane || 'N/A';
-    const createdAt = vehicle.created_at ? new Date(vehicle.created_at).toLocaleString() : 'N/A';
-    
+    // Mark vehicle as completed
+    async function markAsCompleted(vehicleId) {
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
+                method: 'PATCH'
+            });
+            
+            await response.json();
+            showNotification('Vehicle marked as completed!', 'success');
+            await loadVehicles();
+            
+        } catch (error) {
+            // Error is already handled in makeAuthRequest
+        }
+    }
+
+    // Generate receipt - IMPROVED FOR MOBILE & DESKTOP
+    document.getElementById('getReceiptBtn').addEventListener('click', async function() {
+        const vehicleId = document.getElementById('receiptId').value.trim();
+        if (!vehicleId) {
+            showNotification('Please enter a vehicle ID', 'error');
+            return;
+        }
+        
+        try {
+            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
+            const vehicle = await response.json();
+            
+            if (vehicle.message === 'Vehicle not washed yet!') {
+                showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
+                return;
+            }
+            
+            // Generate receipt that works on all devices
+            generateReceipt(vehicle);
+            document.getElementById('receiptId').value = '';
+            
+        } catch (error) {
+            // Error is already handled in makeAuthRequest
+        }
+    });
+
+    // Simple function to generate receipt that works everywhere
+    function generateReceipt(vehicle) {
+    // Create receipt content
     const receiptContent = `
         <div style="padding: 20px; background: white; color: black; max-width: 500px; margin: 0 auto;">
             <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
@@ -904,31 +864,25 @@ function showReceiptPopup(vehicle) {
             
             <div style="margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Vehicle Type:</strong> <span>${vehicleType}</span>
+                    <strong>Vehicle Type:</strong> <span>${vehicle.Vehicle || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>License Plate:</strong> <span>${licensePlate}</span>
+                    <strong>Number Plate:</strong> <span>${vehicle.numberPlate || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Assigned Lane:</strong> <span>${assignedLane}</span>
+                    <strong>Assigned Lane:</strong> <span>${vehicle.Assignedlane || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Token:</strong> <span>${token}</span>
+                    <strong>Token:</strong> <span>${vehicle.Token || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Price:</strong> <span>${price}</span>
+                    <strong>Price:</strong> <span>${vehicle.Price || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Wash Time:</strong> <span>${washTime}</span>
+                    <strong>Completed At:</strong> <span>${vehicle.completedAt || 'N/A'}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Created At:</strong> <span>${createdAt}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Completed At:</strong> <span>${completedAt}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Status:</strong> <span>${status}</span>
+                    <strong>Status:</strong> <span>${vehicle.status || 'N/A'}</span>
                 </div>
             </div>
             
@@ -945,14 +899,15 @@ function showReceiptPopup(vehicle) {
                     width: 100%;
                 ">Print Receipt</button>
                 <p style="color: #666; font-size: 0.9rem;">
-                    Thank you for choosing AutoWash Pro!
+                    Tip: Use browser print option or press Ctrl+P
                 </p>
             </div>
         </div>
     `;
 
+    // Open popup-like window with fixed size
     const width = 600;
-    const height = 750;
+    const height = 700;
     const left = (screen.width - width) / 2;
     const top = (screen.height - height) / 2;
     
@@ -992,102 +947,123 @@ function showReceiptPopup(vehicle) {
         newWindow.document.close();
         showNotification('Receipt opened in popup!', 'success');
     } else {
-        showNotification('Please allow popups for receipts', 'error');
+        // Fallback for mobile/popup blockers
+        showReceiptInCurrentWindow(receiptContent);
     }
 }
+    // Fallback function for mobile devices
+    function showReceiptInCurrentWindow(receiptContent) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        `;
 
-// Update statistics
-function updateStats(vehicles) {
-    const total = vehicles.length;
-    const pending = vehicles.filter(v => v.status === 'pending').length;
-    const completed = vehicles.filter(v => v.status === 'completed').length;
-    
-    document.getElementById('total-vehicles').textContent = total;
-    document.getElementById('pending-vehicles').textContent = pending;
-    document.getElementById('completed-vehicles').textContent = completed;
-}
+        const container = document.createElement('div');
+        container.style.cssText = `
+            background: white;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        `;
+        container.innerHTML = receiptContent;
 
-// Initialize event listeners
-function initializeEventListeners() {
-    // Add vehicle button
-    const addVehicleBtn = document.getElementById('addVehicleBtn');
-    if (addVehicleBtn) {
-        addVehicleBtn.addEventListener('click', addVehicle);
-    }
-    
-    // Get receipt button
-    const getReceiptBtn = document.getElementById('getReceiptBtn');
-    if (getReceiptBtn) {
-        getReceiptBtn.addEventListener('click', generateReceipt);
-    }
-    
-    // Refresh button
-    const refreshBtn = document.querySelector('.refresh-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', loadVehicles);
-    }
-    
-    // Tab buttons
-    document.querySelectorAll('.queue-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            showTab(this.textContent.toLowerCase());
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.style.cssText = `
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px;
+            width: calc(100% - 20px);
+        `;
+        closeBtn.onclick = () => overlay.remove();
+
+        container.appendChild(closeBtn);
+        overlay.appendChild(container);
+        document.body.appendChild(overlay);
+
+        // Close when clicking outside
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+            }
         });
-    });
-}
 
-// Main initialization function
-function initializeApp() {
-    const token = getAuthToken();
-    
-    if (!token) {
-        showNotification('Please login to access dashboard', 'error');
-        setTimeout(() => {
-            window.location.href = '/';
-        }, 2000);
-        return;
+        showNotification('Receipt displayed on screen', 'success');
     }
-    
-    // Initialize all event listeners
-    initializeEventListeners();
-    initializeVehicleTypeListener();
-    
-    // Initial load
-    loadVehicles();
-    
-    // Auto-refresh every 10 seconds
-    setInterval(loadVehicles, 10000);
-    
-    // Add logout button to header
-    addLogoutButton();
-}
 
-// Add logout button dynamically
-function addLogoutButton() {
-    const header = document.querySelector('header');
-    if (!header) return;
-    
-    const logoutBtn = document.createElement('button');
-    logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
-    logoutBtn.style.cssText = `
-        background: var(--accent-orange);
-        color: var(--black);
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        margin-left: auto;
-    `;
-    logoutBtn.onclick = function() {
+    // Update statistics
+    function updateStats(vehicles) {
+        const total = vehicles.length;
+        const pending = vehicles.filter(v => v.status === 'pending').length;
+        const completed = vehicles.filter(v => v.status === 'completed').length;
+        
+        document.getElementById('total-vehicles').textContent = total;
+        document.getElementById('pending-vehicles').textContent = pending;
+        document.getElementById('completed-vehicles').textContent = completed;
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const token = getAuthToken();
+        
+        if (!token) {
+            showNotification('Please login to access dashboard', 'error');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+            return;
+        }
+        
+        // Initial load
+        loadVehicles();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(loadVehicles, 10000);
+    });
+
+    // Add logout functionality
+    function logout() {
         localStorage.removeItem('authToken');
         window.location.href = '/';
-    };
-    
-    header.appendChild(logoutBtn);
-}
+    }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', initializeApp);
+    // Add logout button to header
+    document.addEventListener('DOMContentLoaded', function() {
+        const header = document.querySelector('header');
+        const logoutBtn = document.createElement('button');
+        logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
+        logoutBtn.style.cssText = `
+            background: var(--accent-orange);
+            color: var(--black);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: auto;
+        `;
+        logoutBtn.onclick = logout;
+        
+        header.appendChild(logoutBtn);
+    });
 </script>
   
 </body>
