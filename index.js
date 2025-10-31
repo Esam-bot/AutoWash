@@ -49,11 +49,12 @@ function requireAuth(req, res, next) {
 }
 
 const client = new Client({
-    host: 'localhost',
-    port: 5432,
-    database: 'Autowash',
-    user: 'postgres',
-    password: 'april2004'
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'PROJECT',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASS || 'april2004'
+   
 })
 
 client.connect()
