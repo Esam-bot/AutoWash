@@ -584,7 +584,7 @@
         return localStorage.getItem('authToken');
     }
 
-    // Function to make authenticated requests
+    // Function to make authenticated requests - IMPROVED ERROR HANDLING
     async function makeAuthRequest(url, options = {}) {
         const token = getAuthToken();
         
@@ -613,6 +613,7 @@
         };
         
         try {
+            console.log('Making request to:', url, mergedOptions);
             const response = await fetch(url, mergedOptions);
             
             if (response.status === 401) {
@@ -624,9 +625,18 @@
                 throw new Error('Unauthorized');
             }
             
-            const data = await response.json();
+            // Check if response has content
+            const contentType = response.headers.get('content-type');
+            let data;
             
-            if (!response.ok || data.message?.includes('Issue') || data.message?.includes('error')) {
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(text || `HTTP error! status: ${response.status}`);
+            }
+            
+            if (!response.ok) {
                 throw new Error(data.message || `HTTP error! status: ${response.status}`);
             }
             
@@ -690,7 +700,7 @@
         return pattern.test(plate);
     }
 
-    // Add new vehicle - FIXED FIELD NAMES TO MATCH BACKEND
+    // Add new vehicle - FIXED: CORRECT FIELD NAMES
     document.getElementById('addVehicleBtn').addEventListener('click', async function() {
         const vehicleType = document.getElementById('vehicleType').value;
         const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
@@ -709,10 +719,9 @@
         const formData = {
             vehicle: vehicleType,                    // Backend expects 'vehicle'
             number_plate: numberPlate,               // Backend expects 'number_plate'
-            assigned_lane: 1,                        // Backend expects 'assigned_lane' (default to 1)
+            assigned_lane: 1,                        // Backend expects 'assigned_lane'
             price: vehiclePrices[vehicleType],       // Backend expects 'price'
             wash_time: vehicleWashTimes[vehicleType] // Backend expects 'wash_time'
-            // Note: status, token, timestamps are handled by backend
         };
         
         console.log('Sending data to backend:', formData);
@@ -723,10 +732,10 @@
                 body: JSON.stringify(formData)
             });
             
-            showNotification('Vehicle added successfully!', 'success');
+            showNotification('Vehicle added successfully! Token: ' + (vehicle.token || vehicle.id), 'success');
             
-            // Display the generated ID
-            document.getElementById('tokenValue').textContent = vehicle.id;
+            // Display the generated token
+            document.getElementById('tokenValue').textContent = vehicle.token || vehicle.id;
             document.getElementById('tokenDisplay').style.display = 'block';
             
             // Clear form
@@ -744,13 +753,14 @@
         }
     });
 
-    // Load all vehicles - FLEXIBLE FIELD HANDLING
+    // Load all vehicles - IMPROVED ERROR HANDLING
     let currentTab = 'pending';
     async function loadVehicles() {
         try {
             const vehicles = await makeAuthRequest(`${API_BASE}/wash`);
             
             allVehicles = Array.isArray(vehicles) ? vehicles : [];
+            console.log('Loaded vehicles:', allVehicles);
             updateStats(allVehicles);
             renderQueue(currentTab);
             
@@ -801,13 +811,14 @@
             const vehicleId = vehicle.id || 'Unknown';
             const status = vehicle.status || 'unknown';
             const assignedLane = vehicle.assigned_lane || 'Not assigned';
+            const token = vehicle.token || 'N/A';
             
             return `
             <div class="vehicle-item ${status === 'completed' ? 'completed' : ''}">
                 <div class="vehicle-info">
                     <h3>${vehicleType} - ${licensePlate}</h3>
                     <p>Lane: ${assignedLane} | Price: ${price}</p>
-                    <p>Time: ${washTime} | Token: ${vehicle.token || 'N/A'} | ID: ${vehicleId}</p>
+                    <p>Time: ${washTime} | Token: ${token} | ID: ${vehicleId}</p>
                     <span class="status-badge ${status === 'pending' ? 'status-pending' : 'status-completed'}">
                         ${status}
                     </span>
@@ -825,10 +836,9 @@
         }).join('');
     }
 
-    // Mark vehicle as completed - FIXED ENDPOINT
+    // Mark vehicle as completed
     async function markAsCompleted(vehicleId) {
         try {
-            // FIXED: Use the correct endpoint from your routes
             await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
                 method: 'PATCH'
             });
@@ -842,7 +852,7 @@
         }
     }
 
-    // Generate receipt - FIXED ENDPOINT
+    // Generate receipt
     document.getElementById('getReceiptBtn').addEventListener('click', async function() {
         const vehicleId = document.getElementById('receiptId').value.trim();
         if (!vehicleId) {
@@ -858,7 +868,7 @@
                 return;
             }
             
-            // Generate receipt that works on all devices
+            // Generate receipt
             generateReceipt(vehicle);
             document.getElementById('receiptId').value = '';
             
@@ -868,9 +878,8 @@
         }
     });
 
-    // Simple function to generate receipt that works everywhere - USE BACKEND FIELD NAMES
+    // Generate receipt function
     function generateReceipt(vehicle) {
-        // Use backend field names
         const vehicleType = vehicle.vehicle || 'N/A';
         const licensePlate = vehicle.number_plate || 'N/A';
         const price = vehicle.price || 'N/A';
@@ -880,7 +889,6 @@
         const token = vehicle.token || 'N/A';
         const assignedLane = vehicle.assigned_lane || 'N/A';
         
-        // Create receipt content with backend field names
         const receiptContent = `
             <div style="padding: 20px; background: white; color: black; max-width: 500px; margin: 0 auto;">
                 <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
@@ -935,7 +943,7 @@
             </div>
         `;
 
-        // Open popup-like window with fixed size
+        // Open popup
         const width = 600;
         const height = 700;
         const left = (screen.width - width) / 2;
@@ -977,67 +985,8 @@
             newWindow.document.close();
             showNotification('Receipt opened in popup!', 'success');
         } else {
-            // Fallback for mobile/popup blockers
-            showReceiptInCurrentWindow(receiptContent);
+            showNotification('Please allow popups for receipts', 'error');
         }
-    }
-
-    // Fallback function for mobile devices
-    function showReceiptInCurrentWindow(receiptContent) {
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        `;
-
-        const container = document.createElement('div');
-        container.style.cssText = `
-            background: white;
-            border-radius: 10px;
-            max-width: 500px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-        `;
-        container.innerHTML = receiptContent;
-
-        // Add close button
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Close';
-        closeBtn.style.cssText = `
-            background: #ff6b35;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 10px;
-            width: calc(100% - 20px);
-        `;
-        closeBtn.onclick = () => overlay.remove();
-
-        container.appendChild(closeBtn);
-        overlay.appendChild(container);
-        document.body.appendChild(overlay);
-
-        // Close when clicking outside
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                overlay.remove();
-            }
-        });
-
-        showNotification('Receipt displayed on screen', 'success');
     }
 
     // Update statistics
@@ -1068,16 +1017,8 @@
         
         // Auto-refresh every 10 seconds
         setInterval(loadVehicles, 10000);
-    });
-
-    // Add logout functionality
-    function logout() {
-        localStorage.removeItem('authToken');
-        window.location.href = '/';
-    }
-
-    // Add logout button to header
-    document.addEventListener('DOMContentLoaded', function() {
+        
+        // Add logout button to header
         const header = document.querySelector('header');
         const logoutBtn = document.createElement('button');
         logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
@@ -1091,12 +1032,14 @@
             font-weight: bold;
             margin-left: auto;
         `;
-        logoutBtn.onclick = logout;
+        logoutBtn.onclick = function() {
+            localStorage.removeItem('authToken');
+            window.location.href = '/';
+        };
         
         header.appendChild(logoutBtn);
     });
 </script>
-  
   
 </body>
 </html>
