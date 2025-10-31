@@ -11,6 +11,15 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+app.use(cors({
+  origin: true, // Allow all origins in production
+  credentials: true
+}));
+
+// Handle preflight for all routes
+app.options('*', cors());
+
+
 // Serve static files from frontend directory
 app.use(express.static(path.join(__dirname, 'frontend')))
 
