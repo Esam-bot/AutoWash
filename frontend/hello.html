@@ -565,6 +565,7 @@
 <script>
     const API_BASE = '/api/vehicles';
     let allVehicles = [];
+    let isAddingVehicle = false; // Prevent multiple clicks
 
     // Fixed prices and wash times
     const vehiclePrices = {
@@ -584,7 +585,7 @@
         return localStorage.getItem('authToken');
     }
 
-    // Function to make authenticated requests - SIMPLIFIED
+    // Function to make authenticated requests - DEBUG VERSION
     async function makeAuthRequest(url, options = {}) {
         const token = getAuthToken();
         
@@ -606,7 +607,9 @@
         
         try {
             console.log('📤 Making request to:', url);
+            
             const response = await fetch(url, config);
+            console.log('📥 Response status:', response.status);
             
             // Handle unauthorized
             if (response.status === 401) {
@@ -617,13 +620,14 @@
             }
             
             const data = await response.json();
+            console.log('📥 Response data:', data);
             
             // Your backend returns error messages in {message: 'error text'}
             if (!response.ok) {
                 throw new Error(data.message || `Request failed with status ${response.status}`);
             }
             
-            console.log('✅ Request successful:', data);
+            console.log('✅ Request successful');
             return data;
             
         } catch (error) {
@@ -675,33 +679,46 @@
         return pattern.test(plate);
     }
 
-    // Add new vehicle - SIMPLIFIED AND FIXED
+    // Add new vehicle - WITH DEBOUNCING
     document.getElementById('addVehicleBtn').addEventListener('click', async function() {
-        const vehicleType = document.getElementById('vehicleType').value;
-        const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
-        
-        if (!vehicleType || !numberPlate) {
-            showNotification('Please fill all fields', 'error');
-            return;
-        }
-
-        if (!validateNumberPlate(numberPlate)) {
-            showNotification('Invalid number plate format! Use format: ABC-123 or XYZ-1234', 'error');
+        // Prevent multiple clicks
+        if (isAddingVehicle) {
+            console.log('🔄 Already adding vehicle, please wait...');
             return;
         }
         
-        // Data that matches your backend exactly
-        const vehicleData = {
-            vehicle: vehicleType,
-            number_plate: numberPlate,
-            assigned_lane: 1, // Default lane
-            price: vehiclePrices[vehicleType],
-            wash_time: vehicleWashTimes[vehicleType]
-        };
-        
-        console.log('🚗 Adding vehicle:', vehicleData);
+        isAddingVehicle = true;
         
         try {
+            const vehicleType = document.getElementById('vehicleType').value;
+            const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
+            
+            if (!vehicleType || !numberPlate) {
+                showNotification('Please fill all fields', 'error');
+                return;
+            }
+
+            if (!validateNumberPlate(numberPlate)) {
+                showNotification('Invalid number plate format! Use format: ABC-123 or XYZ-1234', 'error');
+                return;
+            }
+            
+            // Data that matches your backend exactly
+            const vehicleData = {
+                vehicle: vehicleType,
+                number_plate: numberPlate,
+                assigned_lane: 1, // Default lane
+                price: vehiclePrices[vehicleType],
+                wash_time: vehicleWashTimes[vehicleType]
+            };
+            
+            console.log('🚗 Adding vehicle:', vehicleData);
+            
+            // Disable button during request
+            const addBtn = document.getElementById('addVehicleBtn');
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding Vehicle...';
+            
             // Your backend route: POST /api/vehicles/wash
             const newVehicle = await makeAuthRequest(`${API_BASE}/wash`, {
                 method: 'POST',
@@ -729,7 +746,13 @@
             
         } catch (error) {
             console.error('Failed to add vehicle:', error);
-            // Error is handled in makeAuthRequest
+            // Error is already shown in makeAuthRequest
+        } finally {
+            // Re-enable button
+            isAddingVehicle = false;
+            const addBtn = document.getElementById('addVehicleBtn');
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<i class="fas fa-car-side"></i> Add Vehicle for Wash';
         }
     });
 
