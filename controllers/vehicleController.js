@@ -1,32 +1,35 @@
-const Vehicle = require('../models/vehicle')
- 
+let client; // This will be set from index.js
+
+const setClient = (dbClient) => {
+    client = dbClient;
+};
+
 const generateToken = () => {
-   // let tokencounter = 1 
-   // const token = `WASH${tokencounter.toString().padStart(4,'0')}`
-   // tokencounter++;
-   // return token
-       return `WASH${Date.now().toString().slice(-6)}`;
- 
-   // const timestamp = Date.now().toString().slice(-6);
-   // const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-   // return `WASH${timestamp}${random}`;
+    return `WASH${Date.now().toString().slice(-6)}`;
 }
 
 const checkAndUpdateCompletedVehicles = async () => {
     try {
         const now = new Date();
-        const pendingVehicles = await Vehicle.find({ status: 'pending' });
+        
+        const result = await client.query(
+            'SELECT * FROM vehicles WHERE status = $1',
+            ['pending']
+        );
+        
+        const pendingVehicles = result.rows;
         
         for (let vehicle of pendingVehicles) {
-            try {                
-                if (now >= vehicle.estimatedCompletionTime) {
-                    vehicle.status = 'completed';
-                    vehicle.completedAt = new Date();
-                    await vehicle.save();
-                    console.log(`Auto-completed: ${vehicle.numberPlate}`);
+            try {
+                if (vehicle.estimated_completion_time && now >= new Date(vehicle.estimated_completion_time)) {
+                    await client.query(
+                        'UPDATE vehicles SET status = $1, completed_at = $2, updated_at = $3 WHERE id = $4',
+                        ['completed', new Date(), new Date(), vehicle.id]
+                    );
+                    console.log(`Auto-completed: ${vehicle.number_plate}`);
                 }
             } catch (vehicleError) {
-                console.log('Error processing vehicle:', vehicle._id, vehicleError.message);
+                console.log('Error processing vehicle:', vehicle.id, vehicleError.message);
                 continue;
             }
         }
@@ -35,149 +38,152 @@ const checkAndUpdateCompletedVehicles = async () => {
     }
 }
 
-//adding a vehicle
+// Adding a vehicle
 const addvehicle = async (req, res) => {
     try {
-        const { numberPlate, Vehicle: vehicleType, WashTime } = req.body; // Add missing destructuring
-        const plateRegex = /^[A-Z]{2,3}-\d{1,4}$/;
+        const { vehicle, number_plate, assigned_lane, price, wash_time } = req.body;
         
-        if (!plateRegex.test(numberPlate)) {
-            return res.status(400).json({message: 'Invalid number plate format! Use format: ABC-123 or XYZ-1234'});
-        }
+        // Check if number plate already exists
+        const existingVehicle = await client.query(
+            'SELECT * FROM vehicles WHERE number_plate = $1',
+            [number_plate]
+        );
         
-        const existingVehicle = await Vehicle.findOne({ numberPlate: numberPlate});
-        if (existingVehicle) {
+        if (existingVehicle.rows.length > 0) {
             return res.status(400).json({message: 'Number plate already exists in the system!'});
         }
-
-        const assignedlane = await assignsmartlane()
-
-        const lastVehicleInLane = await Vehicle.findOne({
-            Assignedlane: assignedlane,
-            status: 'pending'
-        }).sort({ estimatedCompletionTime: -1 });
-
-        let washStartTime = new Date();
-        if (lastVehicleInLane) {
-            washStartTime = new Date(lastVehicleInLane.estimatedCompletionTime);
-        }
-
-        let washTimeMinutes = 15; // default
-        if (WashTime.includes('15')) washTimeMinutes = 15;
-        else if (WashTime.includes('10')) washTimeMinutes = 10; 
-        else if (WashTime.includes('20')) washTimeMinutes = 20;
-
-        const estimatedCompletionTime = new Date(washStartTime.getTime() + washTimeMinutes * 60000);
-
+        
         const token = generateToken();
         
-        const vehicleData = {
-            ...req.body,  
-            Token: token,
-            status: 'pending',
-            Assignedlane : assignedlane,
-            washStartTime: washStartTime,           
-            estimatedCompletionTime: estimatedCompletionTime  
-        };
+        // Calculate estimated completion time based on wash time
+        let washMinutes = 15; // default for Car
+        if (wash_time.includes('10')) washMinutes = 10; // Bike
+        if (wash_time.includes('20')) washMinutes = 20; // Truck
+        
+        const estimatedCompletionTime = new Date();
+        estimatedCompletionTime.setMinutes(estimatedCompletionTime.getMinutes() + washMinutes);
+        
+        // Insert new vehicle
+        const result = await client.query(
+            `INSERT INTO vehicles 
+             (vehicle, number_plate, assigned_lane, price, wash_time, token, estimated_completion_time, status, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+             RETURNING *`,
+            [
+                vehicle,
+                number_plate,
+                assigned_lane,
+                price,
+                wash_time,
+                token,
+                estimatedCompletionTime,
+                'pending',
+                new Date(),
+                new Date()
+            ]
+        );
 
-        const vehicle = await Vehicle.create(vehicleData);
         await checkAndUpdateCompletedVehicles();
-        res.status(200).json(vehicle);
+        res.status(200).json(result.rows[0]);
     } catch (error) {
-        res.status(400).json({message: 'Issue adding a vehicle', error}); 
-    }
-}
-async function assignsmartlane(){
-    try {
-        const activeVehicles = await Vehicle.find({status:'pending'});
-        const checklane={
-            lane1 : false,
-            lane2 : false,
-            lane3 : false
+        console.error('Error adding vehicle:', error);
+        
+        // Handle PostgreSQL constraint violations
+        if (error.code === '23514') { // check constraint violation
+            return res.status(400).json({message: 'Invalid data provided. Check vehicle type, lane, price, or wash time.'});
         }
-
-        activeVehicles.forEach(vehicle=> {
-            if (vehicle.Assignedlane ===  1) checklane.lane1 = true ; // 1 because my db store it as 1 
-            if (vehicle.Assignedlane ===  2) checklane.lane2 = true ; 
-            if (vehicle.Assignedlane ===  3) checklane.lane3 = true ;            
-        });
-
-        //priority lane 1 so
-        if (!checklane.lane1) return  1;
-        else if (!checklane.lane2) return  2;
-        else if (!checklane.lane3) return  3;
-        else return 1 ;
-
-    } catch (error) {
-        console.error('Error assigning lane:', error);
-        return 1
-        
-    }
-}
-
-//getting all vehicles
-const getvehicle = async (req,res)=>{
-    try {
-        await checkAndUpdateCompletedVehicles();
-        
-        const vehicles = await Vehicle.find().sort({ createdAt: -1 });
-        res.status(200).json(vehicles);  
-    } catch (error) {
-        res.status(400).json({message: 'issue getting vehicles', error});
-    }
-}
-
-//marking a specific vehicle wash completed
-const washvehicle = async (req,res)=>{
-    try {
-        const {id} = req.params;
-        const vehicle = await Vehicle.findById(id);
-        if(!vehicle){
-            return res.status(404).json({message:'No vehicle found with this ID'})
+        if (error.code === '23505') { // unique constraint violation
+            return res.status(400).json({message: 'Number plate or token already exists.'});
         }
         
-        if(vehicle.status === "pending"){ 
-            vehicle.status = 'completed';
-            vehicle.completedAt = new Date(); 
-            vehicle.updatedAt = new Date();
-            await vehicle.save();
-            res.status(200).json({message:'Vehicle status updated from pending to completed'})
+        res.status(400).json({message: 'Issue adding a vehicle', error: error.message});
+    }
+}
+
+// Getting all vehicles
+const getvehicle = async (req, res) => {
+    try {
+        await checkAndUpdateCompletedVehicles();
+        
+        const result = await client.query(
+            'SELECT * FROM vehicles ORDER BY created_at DESC'
+        );
+        
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error getting vehicles:', error);
+        res.status(400).json({message: 'Issue getting vehicles', error: error.message});
+    }
+}
+
+// Marking a specific vehicle wash completed
+const washvehicle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const vehicleResult = await client.query(
+            'SELECT * FROM vehicles WHERE id = $1',
+            [id]
+        );
+        
+        if (vehicleResult.rows.length === 0) {
+            return res.status(404).json({message: 'No vehicle found with this ID'});
+        }
+        
+        const vehicle = vehicleResult.rows[0];
+        
+        if (vehicle.status === "pending") {
+            await client.query(
+                'UPDATE vehicles SET status = $1, completed_at = $2, updated_at = $3 WHERE id = $4',
+                ['completed', new Date(), new Date(), id]
+            );
+            
+            res.status(200).json({message: 'Vehicle status updated from pending to completed'});
         } else {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
                 message: `Vehicle is already ${vehicle.status}`
-            })
+            });
         }
-
     } catch (error) {
-        res.status(500).json({message:'Internal server error while updating status'})
+        console.error('Error updating vehicle status:', error);
+        res.status(500).json({message: 'Internal server error while updating status', error: error.message});
     }
 }
 
-
-//receipt of completed car wash
-const receipt = async (req,res)=>{
+// Receipt of completed car wash
+const receipt = async (req, res) => {
     try {
-        const {id}=req.params;
-        const vehicle = await Vehicle.findById(id);
-        if(vehicle.status !== "completed"){ 
-            return res.status(200).json({
-                message:'Vehicle not washed yet!',
-            })
+        const { id } = req.params;
+        
+        const result = await client.query(
+            'SELECT * FROM vehicles WHERE id = $1',
+            [id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({message: 'Vehicle not found'});
         }
-        res.status(200).json(vehicle)
+        
+        const vehicle = result.rows[0];
+        
+        if (vehicle.status !== "completed") {
+            return res.status(200).json({
+                message: 'Vehicle not washed yet!',
+            });
+        }
+        
+        res.status(200).json(vehicle);
     } catch (error) {
-        res.status(400).json({message:'error getting receipt'})
+        console.error('Error getting receipt:', error);
+        res.status(400).json({message: 'Error getting receipt', error: error.message});
     }
 }
 
-
-module.exports ={ 
+module.exports = {
+    setClient,  // ← ADD THIS to exports
     addvehicle,
     getvehicle,
     washvehicle,
-    receipt,
-    checkAndUpdateCompletedVehicles
+    receipt
 }
-
-//setInterval(checkAndUpdateCompletedVehicles, 60000);
