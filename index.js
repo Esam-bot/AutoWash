@@ -1,7 +1,9 @@
 const express = require('express')
-const mongoose = require('mongoose')
+const { Client } = require('pg')
 const cors = require('cors')
 const path = require('path')
+const vehicleRoutes = require('./routes/vehicleRoutes') //
+
 
 const app = express()
 
@@ -37,22 +39,53 @@ function requireAuth(req, res, next) {
     }
 }
 
-// Import routes
-const vehicleRoutes = require('./routes/vehicleRoutes')
-
-// MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://car_management:carmanagement123@cluster0.z64gx4e.mongodb.net/can_wash_system?retryWrites=true&w=majority&appName=Cluster0';
-
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})    
-.then(() => {
-    console.log('MongoDB CONNECTED successfully')
+const client = new Client({
+    host: 'localhost',
+    port: 5432,
+    database: 'Autowash',
+    user: 'postgres',
+    password: 'april2004'
 })
-.catch((error) => {
-    console.log('Error Connecting MongoDB:', error.message)
-})
+
+client.connect()
+    .then(() => {
+        console.log('✅ PostgreSQL CONNECTED successfully to database: PROJECT')
+        // Create vehicles table if it doesn't exist
+        return client.query(`
+            CREATE TABLE IF NOT EXISTS vehicles (
+                id SERIAL PRIMARY KEY,
+                vehicle VARCHAR(20) NOT NULL CHECK (vehicle IN ('Car','Bike','Truck')),
+                number_plate VARCHAR(20) NOT NULL UNIQUE,
+                assigned_lane INTEGER NOT NULL CHECK (assigned_lane IN (1, 2, 3)),
+                price VARCHAR(50) NOT NULL CHECK (price IN ('500PKR for Car', '300PKR for Bike', '800PKR for Truck')),
+                wash_time VARCHAR(50) NOT NULL CHECK (wash_time IN ('15Min for Car', '10Min for Bike', '20Min for Truck')),
+                token VARCHAR(50) NOT NULL UNIQUE,
+                status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
+                wash_start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                estimated_completion_time TIMESTAMP,
+                completed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    })
+    .then(() => {
+        console.log('✅ Vehicles table ready');
+        return client.query('SELECT version()');
+    })
+    .then((result) => {
+        console.log('PostgreSQL version:', result.rows[0].version);
+    })
+    .catch((error) => {
+        console.log('❌ Error Connecting to PostgreSQL:', error.message);
+    })
+
+// Make the client available to your routes
+app.set('dbClient', client)
+
+const vehicleController = require('./controllers/vehicleController');
+
+vehicleController.setClient(client);  // ← ADD THIS LINE
 
 // API Routes
 app.post('/api/login', (req, res) => {
