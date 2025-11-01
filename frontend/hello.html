@@ -562,22 +562,27 @@
     <footer>
         <p>AutoWash Pro Car Wash Management System &copy; 2023 | Premium Vehicle Care</p>
     </footer>
-
     <script>
     const API_BASE = '/api/vehicles';
     let allVehicles = [];
 
-    // Fixed prices and wash times
-    const vehiclePrices = {
-        'Car': '500PKR for Car',
-        'Bike': '300PKR for Bike', 
-        'Truck': '800PKR for Truck'
-    };
-
-    const vehicleWashTimes = {
-        'Car': '15Min for Car',
-        'Bike': '10Min for Bike',
-        'Truck': '20Min for Truck'
+    // Vehicle configuration matching backend database constraints
+    const vehicleConfig = {
+        'Car': {
+            price: '500PKR for Car',
+            washTime: '15Min for Car',
+            washMinutes: 15
+        },
+        'Bike': {
+            price: '300PKR for Bike',
+            washTime: '10Min for Bike', 
+            washMinutes: 10
+        },
+        'Truck': {
+            price: '800PKR for Truck',
+            washTime: '20Min for Truck',
+            washMinutes: 20
+        }
     };
 
     // Function to get auth token
@@ -626,11 +631,11 @@
             }
             
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-                throw new Error(error.message || `HTTP error! status: ${response.status}`);
+                const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
             
-            return response;
+            return await response.json();
         } catch (error) {
             console.error('Request failed:', error);
             showNotification(error.message || 'Network error. Please try again.', 'error');
@@ -638,7 +643,7 @@
         }
     }
 
-    // Show notification
+    // Show notification function
     function showNotification(message, type = 'success') {
         // Remove existing notifications
         document.querySelectorAll('.notification').forEach(notification => notification.remove());
@@ -653,7 +658,7 @@
         
         setTimeout(() => {
             notification.remove();
-        }, 3000);
+        }, 4000);
     }
 
     // Update price and time display when vehicle type changes
@@ -662,9 +667,9 @@
         const priceDisplay = document.getElementById('price-display');
         const timeDisplay = document.getElementById('time-display');
         
-        if (selectedType && vehiclePrices[selectedType]) {
-            priceDisplay.textContent = vehiclePrices[selectedType];
-            timeDisplay.textContent = vehicleWashTimes[selectedType];
+        if (selectedType && vehicleConfig[selectedType]) {
+            priceDisplay.textContent = vehicleConfig[selectedType].price;
+            timeDisplay.textContent = vehicleConfig[selectedType].washTime;
         } else {
             priceDisplay.textContent = 'Select vehicle type to see price';
             timeDisplay.textContent = 'Select vehicle type to see wash time';
@@ -685,12 +690,13 @@
         renderQueue(tabName);
     }
 
+    // Validate number plate format (matches your backend expectations)
     function validateNumberPlate(plate) {
         const pattern = /^[A-Z]{2,3}-\d{1,4}$/;
         return pattern.test(plate);
     }
 
-    // Add new vehicle
+    // Add new vehicle - CORRECTED to match backend field names
     document.getElementById('addVehicleBtn').addEventListener('click', async function() {
         const vehicleType = document.getElementById('vehicleType').value;
         const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
@@ -705,24 +711,25 @@
             return;
         }    
         
+        // CORRECTED: Match exact backend field names from vehicleController.js
         const formData = {
-            Vehicle: vehicleType,
-            numberPlate: numberPlate,
-            Price: vehiclePrices[vehicleType],
-            WashTime: vehicleWashTimes[vehicleType]
+            vehicle: vehicleType,                    // Backend expects 'vehicle'
+            number_plate: numberPlate,               // Backend expects 'number_plate'
+            assigned_lane: 1,                        // Backend expects 'assigned_lane'
+            price: vehicleConfig[vehicleType].price, // Backend expects 'price'
+            wash_time: vehicleConfig[vehicleType].washTime // Backend expects 'wash_time'
         };
         
         try {
-            const response = await makeAuthRequest(`${API_BASE}/wash`, {
+            const vehicle = await makeAuthRequest(`${API_BASE}/wash`, {
                 method: 'POST',
                 body: JSON.stringify(formData)
             });
             
-            const vehicle = await response.json();
-            showNotification('Vehicle added successfully! Token generated.', 'success');
+            showNotification(`Vehicle added successfully! Token: ${vehicle.token}`, 'success');
             
-            // Display the generated token
-            document.getElementById('tokenValue').textContent = vehicle._id || vehicle.id;
+            // Display the generated token (matches backend token format)
+            document.getElementById('tokenValue').textContent = vehicle.token;
             document.getElementById('tokenDisplay').style.display = 'block';
             
             // Clear form
@@ -736,15 +743,15 @@
             
         } catch (error) {
             // Error is already handled in makeAuthRequest
+            console.error('Error adding vehicle:', error);
         }
     });
 
-    // Load all vehicles
+    // Load all vehicles from backend
     let currentTab = 'pending';
     async function loadVehicles() {
         try {
-            const response = await makeAuthRequest(`${API_BASE}/wash`);
-            const vehicles = await response.json();
+            const vehicles = await makeAuthRequest(`${API_BASE}/wash`);
             
             allVehicles = Array.isArray(vehicles) ? vehicles : [];
             updateStats(allVehicles);
@@ -758,7 +765,7 @@
         }
     }
 
-    // Render the queue
+    // Render the queue with backend field names
     function renderQueue(tabName) {
         currentTab = tabName;
         let vehiclesToShow = [];
@@ -787,45 +794,59 @@
             return;
         }
         
-        container.innerHTML = vehiclesToShow.map(vehicle => `
-            <div class="vehicle-item ${vehicle.status === 'completed' ? 'completed' : ''}">
+        container.innerHTML = vehiclesToShow.map(vehicle => {
+            const vehicleType = vehicle.vehicle || 'Unknown';
+            const licensePlate = vehicle.number_plate || 'Unknown';
+            const price = vehicle.price || 'Unknown';
+            const washTime = vehicle.wash_time || 'Unknown';
+            const vehicleId = vehicle.id || 'Unknown';
+            const status = vehicle.status || 'unknown';
+            const assignedLane = vehicle.assigned_lane || 'Not assigned';
+            const token = vehicle.token || 'N/A';
+            const estimatedCompletion = vehicle.estimated_completion_time ? 
+                new Date(vehicle.estimated_completion_time).toLocaleTimeString() : 'N/A';
+            
+            return `
+            <div class="vehicle-item ${status === 'completed' ? 'completed' : ''}">
                 <div class="vehicle-info">
-                    <h3>${vehicle.Vehicle} - ${vehicle.numberPlate}</h3>
-                    <p>Lane: ${vehicle.Assignedlane || 'Not assigned'} | Price: ${vehicle.Price}</p>
-                    <p>Time: ${vehicle.WashTime} | Token: ${vehicle.Token || 'N/A'} | ID: ${vehicle._id || vehicle.id}</p>
-                    <span class="status-badge ${vehicle.status === 'pending' ? 'status-pending' : 'status-completed'}">
-                        ${vehicle.status}
+                    <h3>${vehicleType} - ${licensePlate}</h3>
+                    <p>Lane: ${assignedLane} | Price: ${price}</p>
+                    <p>Time: ${washTime} | Token: ${token}</p>
+                    <p>Est. Completion: ${estimatedCompletion} | ID: ${vehicleId}</p>
+                    <span class="status-badge ${status === 'pending' ? 'status-pending' : 'status-completed'}">
+                        ${status}
                     </span>
                 </div>
                 <div class="vehicle-actions">
-                    ${vehicle.status === 'pending' ? 
-                        `<button class="complete-btn" onclick="markAsCompleted('${vehicle._id || vehicle.id}')">
+                    ${status === 'pending' ? 
+                        `<button class="complete-btn" onclick="markAsCompleted('${vehicleId}')">
                             Mark as Completed
                         </button>` : 
                         '<button class="complete-btn" disabled>Completed</button>'
                     }
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    // Mark vehicle as completed
+    // Mark vehicle as completed - matches backend PATCH endpoint
     async function markAsCompleted(vehicleId) {
         try {
-            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
+            const result = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/complete`, {
                 method: 'PATCH'
             });
             
-            await response.json();
-            showNotification('Vehicle marked as completed!', 'success');
+            showNotification('Vehicle marked as completed successfully!', 'success');
             await loadVehicles();
             
         } catch (error) {
+            console.error('Error marking vehicle as completed:', error);
             // Error is already handled in makeAuthRequest
         }
     }
 
-    // Generate receipt - IMPROVED FOR MOBILE & DESKTOP
+    // Generate receipt - matches backend receipt endpoint
     document.getElementById('getReceiptBtn').addEventListener('click', async function() {
         const vehicleId = document.getElementById('receiptId').value.trim();
         if (!vehicleId) {
@@ -834,123 +855,138 @@
         }
         
         try {
-            const response = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
-            const vehicle = await response.json();
+            const vehicle = await makeAuthRequest(`${API_BASE}/wash/${vehicleId}/receipt`);
             
             if (vehicle.message === 'Vehicle not washed yet!') {
                 showNotification('Vehicle not washed yet! Please complete the wash first.', 'error');
                 return;
             }
             
-            // Generate receipt that works on all devices
+            // Generate receipt
             generateReceipt(vehicle);
             document.getElementById('receiptId').value = '';
+            showNotification('Receipt generated successfully!', 'success');
             
         } catch (error) {
+            console.error('Error generating receipt:', error);
             // Error is already handled in makeAuthRequest
         }
     });
 
-    // Simple function to generate receipt that works everywhere
+    // Generate receipt function
     function generateReceipt(vehicle) {
-    // Create receipt content
-    const receiptContent = `
-        <div style="padding: 20px; background: white; color: black; max-width: 500px; margin: 0 auto;">
-            <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
-                <h2 style="color: #333; margin-bottom: 5px;">AutoWash Pro</h2>
-                <h3 style="color: #666; margin-bottom: 5px;">Wash Receipt</h3>
-                <p style="color: #999;">Premium Vehicle Care</p>
+        const vehicleType = vehicle.vehicle || 'N/A';
+        const licensePlate = vehicle.number_plate || 'N/A';
+        const price = vehicle.price || 'N/A';
+        const washTime = vehicle.wash_time || 'N/A';
+        const completedAt = vehicle.completed_at ? new Date(vehicle.completed_at).toLocaleString() : 'N/A';
+        const status = vehicle.status || 'N/A';
+        const token = vehicle.token || 'N/A';
+        const assignedLane = vehicle.assigned_lane || 'N/A';
+        const createdAt = vehicle.created_at ? new Date(vehicle.created_at).toLocaleString() : 'N/A';
+        
+        const receiptContent = `
+            <div style="padding: 20px; background: white; color: black; max-width: 500px; margin: 0 auto;">
+                <div style="text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="color: #333; margin-bottom: 5px;">AutoWash Pro</h2>
+                    <h3 style="color: #666; margin-bottom: 5px;">Wash Receipt</h3>
+                    <p style="color: #999;">Premium Vehicle Care</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Vehicle Type:</strong> <span>${vehicleType}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>License Plate:</strong> <span>${licensePlate}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Assigned Lane:</strong> <span>${assignedLane}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Token:</strong> <span>${token}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Price:</strong> <span>${price}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Wash Time:</strong> <span>${washTime}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Created At:</strong> <span>${createdAt}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Completed At:</strong> <span>${completedAt}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
+                        <strong>Status:</strong> <span>${status}</span>
+                    </div>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button onclick="window.print()" style="
+                        background: #00d4ff; 
+                        color: black; 
+                        border: none; 
+                        padding: 12px 24px; 
+                        border-radius: 5px; 
+                        cursor: pointer; 
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                        width: 100%;
+                    ">Print Receipt</button>
+                    <p style="color: #666; font-size: 0.9rem;">
+                        Thank you for choosing AutoWash Pro!
+                    </p>
+                </div>
             </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Vehicle Type:</strong> <span>${vehicle.Vehicle || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Number Plate:</strong> <span>${vehicle.numberPlate || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Assigned Lane:</strong> <span>${vehicle.Assignedlane || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Token:</strong> <span>${vehicle.Token || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Price:</strong> <span>${vehicle.Price || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Completed At:</strong> <span>${vehicle.completedAt || 'N/A'}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee;">
-                    <strong>Status:</strong> <span>${vehicle.status || 'N/A'}</span>
-                </div>
-            </div>
-            
-            <div style="text-align: center;">
-                <button onclick="window.print()" style="
-                    background: #00d4ff; 
-                    color: black; 
-                    border: none; 
-                    padding: 12px 24px; 
-                    border-radius: 5px; 
-                    cursor: pointer; 
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                    width: 100%;
-                ">Print Receipt</button>
-                <p style="color: #666; font-size: 0.9rem;">
-                    Tip: Use browser print option or press Ctrl+P
-                </p>
-            </div>
-        </div>
-    `;
+        `;
 
-    // Open popup-like window with fixed size
-    const width = 600;
-    const height = 700;
-    const left = (screen.width - width) / 2;
-    const top = (screen.height - height) / 2;
-    
-    const newWindow = window.open('', '_blank', 
-        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-    );
-    
-    if (newWindow) {
-        newWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>AutoWash Pro - Receipt</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        background: #f5f5f5; 
-                        margin: 0; 
-                        padding: 20px;
-                        min-height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    @media print {
-                        body { background: white; padding: 0; }
-                        button { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                ${receiptContent}
-            </body>
-            </html>
-        `);
-        newWindow.document.close();
-        showNotification('Receipt opened in popup!', 'success');
-    } else {
-        // Fallback for mobile/popup blockers
-        showReceiptInCurrentWindow(receiptContent);
+        const width = 600;
+        const height = 750;
+        const left = (screen.width - width) / 2;
+        const top = (screen.height - height) / 2;
+        
+        const newWindow = window.open('', '_blank', 
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+        );
+        
+        if (newWindow) {
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>AutoWash Pro - Receipt</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            background: #f5f5f5; 
+                            margin: 0; 
+                            padding: 20px;
+                            min-height: 100vh;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        @media print {
+                            body { background: white; padding: 0; }
+                            button { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${receiptContent}
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
+        } else {
+            // Fallback for mobile/popup blockers
+            showReceiptInCurrentWindow(receiptContent);
+        }
     }
-}
+
     // Fallback function for mobile devices
     function showReceiptInCurrentWindow(receiptContent) {
         const overlay = document.createElement('div');
@@ -1005,8 +1041,6 @@
                 overlay.remove();
             }
         });
-
-        showNotification('Receipt displayed on screen', 'success');
     }
 
     // Update statistics
@@ -1037,16 +1071,8 @@
         
         // Auto-refresh every 10 seconds
         setInterval(loadVehicles, 10000);
-    });
-
-    // Add logout functionality
-    function logout() {
-        localStorage.removeItem('authToken');
-        window.location.href = '/';
-    }
-
-    // Add logout button to header
-    document.addEventListener('DOMContentLoaded', function() {
+        
+        // Add logout button to header
         const header = document.querySelector('header');
         const logoutBtn = document.createElement('button');
         logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
@@ -1060,11 +1086,14 @@
             font-weight: bold;
             margin-left: auto;
         `;
-        logoutBtn.onclick = logout;
+        logoutBtn.onclick = function() {
+            localStorage.removeItem('authToken');
+            window.location.href = '/';
+        };
         
         header.appendChild(logoutBtn);
     });
 </script>
-  
+
 </body>
 </html>
