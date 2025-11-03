@@ -563,6 +563,7 @@
         <p>AutoWash Pro Car Wash Management System &copy; 2023 | Premium Vehicle Care</p>
     </footer>
     <script>
+            
     const API_BASE = '/api/vehicles';
     let allVehicles = [];
 
@@ -643,6 +644,50 @@
         }
     }
 
+    // Function to calculate available lane based on your specific logic
+    async function getAvailableLane() {
+        try {
+            const vehicles = await makeAuthRequest(`${API_BASE}/wash`);
+            const pendingVehicles = vehicles.filter(v => v.status === 'pending');
+            
+            // Count vehicles in each lane
+            const laneCounts = {1: 0, 2: 0, 3: 0};
+            
+            pendingVehicles.forEach(vehicle => {
+                const lane = vehicle.assigned_lane;
+                if (laneCounts.hasOwnProperty(lane)) {
+                    laneCounts[lane]++;
+                }
+            });
+            
+            console.log('Current lane distribution:', laneCounts);
+            
+            // YOUR SPECIFIC LOGIC:
+            // 1. If Lane 1 is not busy (0 vehicles), assign to Lane 1
+            if (laneCounts[1] === 0) {
+                return 1;
+            }
+            
+            // 2. If Lane 1 is busy, check Lane 2
+            if (laneCounts[2] === 0) {
+                return 2;
+            }
+            
+            // 3. If Lane 2 is busy, check Lane 3
+            if (laneCounts[3] === 0) {
+                return 3;
+            }
+            
+            // 4. If all lanes are busy, priority goes to Lane 1
+            // (Even if Lane 1 is busy, new vehicles go to Lane 1)
+            return 1;
+            
+        } catch (error) {
+            console.error('Error calculating available lane, defaulting to lane 1:', error);
+            return 1; // Default to lane 1 if there's an error
+        }
+    }
+
     // Show notification function
     function showNotification(message, type = 'success') {
         // Remove existing notifications
@@ -696,7 +741,7 @@
         return pattern.test(plate);
     }
 
-    // Add new vehicle - CORRECTED to match backend field names
+    // Add new vehicle - UPDATED with dynamic lane assignment
     document.getElementById('addVehicleBtn').addEventListener('click', async function() {
         const vehicleType = document.getElementById('vehicleType').value;
         const numberPlate = document.getElementById('numberPlate').value.trim().toUpperCase();
@@ -709,15 +754,18 @@
         if (!validateNumberPlate(numberPlate)) {
             showNotification('Invalid number plate format! Use format like: ABC-123 or XYZ-1234', 'error');
             return;
-        }    
+        }
         
-        // CORRECTED: Match exact backend field names from vehicleController.js
+        // Get available lane dynamically based on your specific logic
+        const assignedLane = await getAvailableLane();
+        
+        // CORRECTED: Use dynamic lane assignment
         const formData = {
-            vehicle: vehicleType,                    // Backend expects 'vehicle'
-            number_plate: numberPlate,               // Backend expects 'number_plate'
-            assigned_lane: 1,                        // Backend expects 'assigned_lane'
-            price: vehicleConfig[vehicleType].price, // Backend expects 'price'
-            wash_time: vehicleConfig[vehicleType].washTime // Backend expects 'wash_time'
+            vehicle: vehicleType,
+            number_plate: numberPlate,
+            assigned_lane: assignedLane,  // ← Now dynamic!
+            price: vehicleConfig[vehicleType].price,
+            wash_time: vehicleConfig[vehicleType].washTime
         };
         
         try {
@@ -726,9 +774,9 @@
                 body: JSON.stringify(formData)
             });
             
-            showNotification(`Vehicle added successfully! Token: ${vehicle.token}`, 'success');
+            showNotification(`Vehicle added successfully! Assigned to Lane ${assignedLane}, Token: ${vehicle.token}`, 'success');
             
-            // Display the generated token (matches backend token format)
+            // Display the generated token
             document.getElementById('tokenValue').textContent = vehicle.token;
             document.getElementById('tokenDisplay').style.display = 'block';
             
@@ -742,7 +790,6 @@
             await loadVehicles();
             
         } catch (error) {
-            // Error is already handled in makeAuthRequest
             console.error('Error adding vehicle:', error);
         }
     });
@@ -1094,6 +1141,8 @@
         header.appendChild(logoutBtn);
     });
 </script>
+  
+
 
 </body>
 </html>
