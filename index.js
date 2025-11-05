@@ -81,6 +81,13 @@ client.connect()
     })
     .then(() => {
         console.log('✅ Vehicles table ready');
+        setInterval(() => {
+        try {
+            vehicleController.checkAndUpdateCompletedVehicles();
+        } catch (error) {
+            console.log('❌ Auto-completion check failed:', error.message);
+        }
+    }, 30000);
         return client.query('SELECT version()');
     })
     .then((result) => {
