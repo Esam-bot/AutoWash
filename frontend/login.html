@@ -149,6 +149,10 @@
             <button type="submit" class="btn" id="loginBtn">
                 <i class="fas fa-sign-in-alt"></i> Login
             </button>
+
+            <div class="login-link" style="text-align: center; margin-top: 20px; color: #e0e0e0;">
+            Don't have an account? <a href="register.html">Register here</a>
+            </div>
             
             <div class="loading" id="loading">
                 <i class="fas fa-spinner fa-spin"></i> Logging in...
@@ -159,99 +163,110 @@
             </div>
         </form>
     </div>
+       <script>
+    // ✅ MOVE showNotification function to the TOP
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: #000;
+            font-weight: bold;
+            z-index: 1000;
+            background: ${type === 'success' ? '#00ff88' : '#ff6b35'};
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
 
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const loginBtn = document.getElementById('loginBtn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // Show loading, hide error
+        loginBtn.disabled = true;
+        loading.style.display = 'block';
+        errorMessage.style.display = 'none';
+        
+        try {
+            // ✅ FIX: Changed 'email' to 'username' in console.log
+            console.log('Sending login request with:', { username, password });
             
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const loading = document.getElementById('loading');
-            const errorMessage = document.getElementById('errorMessage');
+            const response = await fetch('/api/users/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    username: username,
+                    password: password 
+                })
+            });
             
-            // Show loading, hide error
-            loginBtn.disabled = true;
-            loading.style.display = 'block';
-            errorMessage.style.display = 'none';
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
             
-            try {
-                console.log('Sending login request...');
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, password })
-                });
+            const data = await response.json();
+            console.log('Login response data:', data);
+            
+            if (data.success) {
+                // Store the token in localStorage
+                localStorage.setItem('authToken', data.token);
+                console.log('Token stored in localStorage');
                 
-                const data = await response.json();
-                console.log('Login response:', data);
+                // Show success message
+                showNotification('Login successful! Redirecting...', 'success');
                 
-                if (data.success) {
-                    // Store the token in localStorage
-                    localStorage.setItem('authToken', data.token);
-                    console.log('Token stored in localStorage:', data.token);
-                    
-                    // Show success message
-                    showNotification('Login successful! Redirecting...', 'success');
-                    
-                    // Redirect to dashboard after short delay
-                    setTimeout(() => {
-                        window.location.href = '/dashboard';
-                    }, 1000);
-                } else {
-                    errorMessage.style.display = 'block';
-                    loginBtn.disabled = false;
-                    loading.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Login error:', error);
+                // Redirect to dashboard after short delay
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1000);
+            } else {
                 errorMessage.style.display = 'block';
+                errorMessage.textContent = data.message || 'Invalid credentials!';
                 loginBtn.disabled = false;
                 loading.style.display = 'none';
             }
-        });
-
-        // Clear error when user starts typing
-        document.getElementById('username').addEventListener('input', function() {
-            document.getElementById('errorMessage').style.display = 'none';
-        });
-        
-        document.getElementById('password').addEventListener('input', function() {
-            document.getElementById('errorMessage').style.display = 'none';
-        });
-
-        // Simple notification function
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 8px;
-                color: #000;
-                font-weight: bold;
-                z-index: 1000;
-                background: ${type === 'success' ? '#00ff88' : '#ff6b35'};
-            `;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
+        } catch (error) {
+            console.error('Login error details:', error);
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            errorMessage.style.display = 'block';
+            errorMessage.textContent = 'Login failed. Check console for details.';
+            loginBtn.disabled = false;
+            loading.style.display = 'none';
         }
+    });
 
-        // Check if already logged in
-        window.addEventListener('load', function() {
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                console.log('Already logged in, redirecting to dashboard...');
-                window.location.href = '/dashboard';
-            }
-        });
-    </script>
+    // Clear error when user starts typing
+    document.getElementById('username').addEventListener('input', function() {
+        document.getElementById('errorMessage').style.display = 'none';
+    });
+    
+    document.getElementById('password').addEventListener('input', function() {
+        document.getElementById('errorMessage').style.display = 'none';
+    });
+
+    // Check if already logged in
+    window.addEventListener('load', function() {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            console.log('Already logged in, redirecting to dashboard...');
+            window.location.href = '/dashboard';
+        }
+    });
+</script>
 </body>
 </html>

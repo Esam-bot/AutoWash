@@ -42,7 +42,10 @@ const checkAndUpdateCompletedVehicles = async () => {
 const addvehicle = async (req, res) => {
     try {
         const { vehicle, number_plate, assigned_lane, price, wash_time } = req.body;
-        
+        const enteredbyuser = req.user.id; 
+        if (!enteredbyuser) {
+            return res.status(400).json({message: 'User ID (enteredbyuser) is required'});
+        }
         // Check if number plate already exists
         const existingVehicle = await client.query(
             'SELECT * FROM vehicles WHERE number_plate = $1',
@@ -59,19 +62,38 @@ const addvehicle = async (req, res) => {
         let washMinutes = 15; // default for Car
         if (wash_time.includes('10')) washMinutes = 10; // Bike
         if (wash_time.includes('20')) washMinutes = 20; // Truck
-        
-        const estimatedCompletionTime = new Date();
-        estimatedCompletionTime.setMinutes(estimatedCompletionTime.getMinutes() + washMinutes);
-        
+      
+         const lastVehicleInLane = await client.query(
+            `SELECT estimated_completion_time 
+             FROM vehicles 
+             WHERE assigned_lane = $1 AND status = 'pending'
+             ORDER BY estimated_completion_time DESC 
+             LIMIT 1`,
+            [assigned_lane]
+        );
+
+        let estimatedCompletionTime;
+
+        if (lastVehicleInLane.rows.length > 0) {
+            const lastCompletionTime = new Date(lastVehicleInLane.rows[0].estimated_completion_time);
+            estimatedCompletionTime = new Date(lastCompletionTime.getTime() + washMinutes * 60000);
+        } else {
+            estimatedCompletionTime = new Date();
+            estimatedCompletionTime.setMinutes(estimatedCompletionTime.getMinutes() + washMinutes);
+        }
+
+
+
         // Insert new vehicle
         const result = await client.query(
             `INSERT INTO vehicles 
-             (vehicle, number_plate, assigned_lane, price, wash_time, token, estimated_completion_time, status, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+             (vehicle, number_plate,ENTEREDBYUSER, assigned_lane, price, wash_time, token, estimated_completion_time, status, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
              RETURNING *`,
             [
                 vehicle,
                 number_plate,
+                enteredbyuser,
                 assigned_lane,
                 price,
                 wash_time,
@@ -84,7 +106,7 @@ const addvehicle = async (req, res) => {
         );
 
         await checkAndUpdateCompletedVehicles();
-        res.status(200).json(result.rows[0]);
+        res.status(201).json(result.rows[0]);
     } catch (error) {
         console.error('Error adding vehicle:', error);
         
@@ -185,5 +207,6 @@ module.exports = {
     addvehicle,
     getvehicle,
     washvehicle,
-    receipt
+    receipt,
+    checkAndUpdateCompletedVehicles 
 }
