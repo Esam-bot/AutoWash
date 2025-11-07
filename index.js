@@ -18,7 +18,6 @@ const sessions = new Map() //keep track of tokens
 
 // Authentication middleware
 function requireAuth(req, res, next) {
-    console.log('Authorization header:', req.headers.authorization);
     
     const authHeader = req.headers.authorization;
     
@@ -29,7 +28,6 @@ function requireAuth(req, res, next) {
         token = authHeader;
     }
     
-    console.log('Extracted token:', token);
     
     if (token && sessions.has(token)) {
         req.user = sessions.get(token);
@@ -89,7 +87,6 @@ client.connect()
         `);
     })
     .then(() => {
-        console.log('✅ Users table ready');
         
         // Start auto-completion service for vehicles
         setInterval(() => {
